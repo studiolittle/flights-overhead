@@ -263,7 +263,8 @@ export function RadarConsole() {
   const code = HOME_AIRPORT.iata;
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
+    // pb-24: room to scroll the footer clear of the pinned online counter.
+    <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 pb-24 md:p-6 md:pb-24">
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <Broadcast size={26} weight="bold" className="text-accent-ink" />
@@ -390,7 +391,6 @@ export function RadarConsole() {
             />
           </div>
         )}
-        {mounted && <OnlineCount />}
         <span>For fun. Enjoy :)</span>
         <a
           href="mailto:info@studiolittle.ca"
@@ -399,6 +399,8 @@ export function RadarConsole() {
           info@studiolittle.ca
         </a>
       </footer>
+
+      {mounted && <OnlineCount />}
     </main>
   );
 }

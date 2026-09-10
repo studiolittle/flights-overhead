@@ -346,6 +346,12 @@ body::after {
   animation: live-blink 2.6s ease-in-out infinite;
 }
 
+/* The bigger dot in the pinned users-online counter. */
+.status-dot-lg {
+  width: 11px;
+  height: 11px;
+}
+
 /* Draws the eye to the phase icon while an aircraft is actually overhead. */
 .pulse-soft {
   animation: pulse-soft 1.4s ease-in-out infinite;

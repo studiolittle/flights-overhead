@@ -79,10 +79,28 @@ export function OnlineCount() {
 
   if (online == null) return null;
 
+  // Pinned to the bottom-right corner so it is always on screen. z-[60]
+  // clears the page vignette (body::after, z-index 50), which would
+  // otherwise dim it.
   return (
-    <span className="flex items-center gap-2 text-ink-dim">
-      <span className="status-dot" aria-hidden="true" />
-      {online} {online === 1 ? "user" : "users"} online
-    </span>
+    <div
+      role="status"
+      className="panel fixed z-[60] flex items-center gap-3 px-4 py-2.5 sm:gap-3.5 sm:px-5 sm:py-3"
+      style={{
+        right: "max(1.25rem, env(safe-area-inset-right))",
+        bottom: "max(1.25rem, env(safe-area-inset-bottom))",
+        boxShadow: "0 10px 30px rgb(0 0 0 / 0.22)",
+      }}
+    >
+      <span className="status-dot status-dot-lg" aria-hidden="true" />
+      <span className="text-[26px] font-semibold leading-none text-ink sm:text-[30px]">
+        {online}
+      </span>
+      <span className="text-[10.5px] leading-[1.25] tracking-[0.2em] text-ink-dim sm:text-[11.5px]">
+        {online === 1 ? "USER" : "USERS"}
+        <br />
+        ONLINE
+      </span>
+    </div>
   );
 }
