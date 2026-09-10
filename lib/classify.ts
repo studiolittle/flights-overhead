@@ -10,6 +10,12 @@ const LOCAL_AIRPORT_KM = 70;
 
 /** Below this, an aircraft is in the approach/departure regime, not cruising. */
 const TERMINAL_ALT_M = 4000;
+/**
+ * Below this (~6,500 ft) an aircraft inside your radar radius is unambiguously
+ * working a nearby airport, so the vertical profile is trusted over any filed
+ * route.
+ */
+const TERMINAL_CERTAIN_ALT_M = 2000;
 const CRUISE_ALT_M = 7000;
 
 /** Vertical rate that counts as a genuine climb or descent, m/s. */
@@ -41,6 +47,16 @@ export function classifyPhase(
   stationLon: number,
 ): FlightPhase {
   const { enrichment: e, baroAltitudeM: altM, verticalRateMs: vs } = contact;
+
+  // Physical evidence outranks the filed route. A callsign's route in the
+  // upstream database can be stale or from a different leg, so an aircraft
+  // low and slow inside your radar radius is operating at an airport near
+  // YOU whatever the route claims. Seen in the wild: a regional jet at
+  // 1300 ft descending into Ottawa still filed as EWR to Greer.
+  if (altM != null && altM < TERMINAL_CERTAIN_ALT_M && vs != null) {
+    if (vs <= -VS_THRESHOLD) return "arriving";
+    if (vs >= VS_THRESHOLD) return "departing";
+  }
 
   const originKm = airportDistanceKm(e?.origin ?? null, stationLat, stationLon);
   const destKm = airportDistanceKm(

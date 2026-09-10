@@ -1,7 +1,5 @@
-// Decoding helpers for the fields OpenSky exposes on a state vector.
-// OpenSky removed its aircraft-metadata endpoint (410 Gone), so registration
-// and airframe model are not available. Everything here is derived from the
-// callsign and the ADS-B enumerations.
+// Decoding helpers for the raw ADS-B fields: turning a callsign into an
+// operator and a flight number, and the coded enumerations into words.
 
 /**
  * ICAO three-letter airline designators. Weighted toward carriers that
@@ -141,37 +139,26 @@ const AIRLINES: Record<string, string> = {
   CUB: "Cubana",
 };
 
-/** ADS-B emitter category (state vector index 17). */
-const CATEGORIES: Record<number, string> = {
-  0: "No information",
-  1: "No ADS-B category",
-  2: "Light (under 15,500 lb)",
-  3: "Small (15,500-75,000 lb)",
-  4: "Large (75,000-300,000 lb)",
-  5: "High-vortex large",
-  6: "Heavy (over 300,000 lb)",
-  7: "High performance",
-  8: "Rotorcraft",
-  9: "Glider / sailplane",
-  10: "Lighter-than-air",
-  11: "Parachutist",
-  12: "Ultralight / paraglider",
-  13: "Reserved",
-  14: "Unmanned aerial vehicle",
-  15: "Space vehicle",
-  16: "Emergency vehicle",
-  17: "Service vehicle",
-  18: "Point obstacle",
-  19: "Cluster obstacle",
-  20: "Line obstacle",
-};
-
-/** ADS-B position source (state vector index 16). */
-const POSITION_SOURCES: Record<number, string> = {
-  0: "ADS-B",
-  1: "ASTERIX",
-  2: "MLAT",
-  3: "FLARM",
+/** ADS-B emitter category, as the letter-digit codes the feed reports. */
+const CATEGORIES: Record<string, string> = {
+  A1: "Light (under 15,500 lb)",
+  A2: "Small (15,500-75,000 lb)",
+  A3: "Large (75,000-300,000 lb)",
+  A4: "High-vortex large",
+  A5: "Heavy (over 300,000 lb)",
+  A6: "High performance",
+  A7: "Rotorcraft",
+  B1: "Glider / sailplane",
+  B2: "Lighter-than-air",
+  B3: "Parachutist",
+  B4: "Ultralight / paraglider",
+  B6: "Unmanned aerial vehicle",
+  B7: "Space vehicle",
+  C1: "Surface vehicle (emergency)",
+  C2: "Surface vehicle (service)",
+  C3: "Point obstacle",
+  C4: "Cluster obstacle",
+  C5: "Line obstacle",
 };
 
 const SQUAWKS: Record<string, { label: string; emergency: boolean }> = {
@@ -237,16 +224,10 @@ export function decodeCallsign(raw: string): CallsignInfo {
   };
 }
 
-export function categoryLabel(category: number | null): string | null {
-  if (category == null) return null;
-  const label = CATEGORIES[category];
-  if (!label || category === 0 || category === 1 || category === 13) return null;
-  return label;
-}
-
-export function positionSourceLabel(source: number | null): string {
-  if (source == null) return "--";
-  return POSITION_SOURCES[source] ?? `Source ${source}`;
+export function categoryLabel(category: string | null): string | null {
+  if (!category) return null;
+  // A0/B0/C0 mean "no information", so there is nothing worth showing.
+  return CATEGORIES[category.toUpperCase()] ?? null;
 }
 
 export function squawkInfo(

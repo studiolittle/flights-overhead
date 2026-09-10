@@ -1,38 +1,87 @@
 "use client";
 
 import { toRad } from "@/lib/geo";
-import type { TrackPoint } from "@/lib/types";
+import type { AirportRef } from "@/lib/types";
 
 const W = 640;
-const H = 260;
-const PAD = 26;
-const MAX_POINTS = 220;
+const H = 240;
+const PAD = 34;
+const ARC_STEPS = 48;
 
-/** Even-stride downsample so a long-haul track stays cheap to render. */
-function thin(path: TrackPoint[]): TrackPoint[] {
-  if (path.length <= MAX_POINTS) return path;
-  const step = path.length / MAX_POINTS;
-  const out: TrackPoint[] = [];
-  for (let i = 0; i < MAX_POINTS; i += 1) out.push(path[Math.floor(i * step)]);
-  out.push(path[path.length - 1]);
+interface Pt {
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Great-circle interpolation, so a long leg bows the way a real route does
+ * instead of cutting a straight line across the projection.
+ */
+function greatCircle(a: Pt, b: Pt, steps = ARC_STEPS): Pt[] {
+  const [lat1, lon1, lat2, lon2] = [
+    toRad(a.lat),
+    toRad(a.lon),
+    toRad(b.lat),
+    toRad(b.lon),
+  ];
+  const d =
+    2 *
+    Math.asin(
+      Math.sqrt(
+        Math.sin((lat2 - lat1) / 2) ** 2 +
+          Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2,
+      ),
+    );
+  if (!Number.isFinite(d) || d === 0) return [a, b];
+
+  const out: Pt[] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const f = i / steps;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+    out.push({
+      lat: (Math.atan2(z, Math.sqrt(x * x + y * y)) * 180) / Math.PI,
+      lon: (Math.atan2(y, x) * 180) / Math.PI,
+    });
+  }
   return out;
 }
 
-export function FlightPathMap({
-  path,
-  station,
-  originLabel,
-}: {
-  path: TrackPoint[];
-  station: { lat: number; lon: number };
-  originLabel: string | null;
-}) {
-  const points = thin(path);
-  if (points.length < 2) return null;
+function airportPoint(a: AirportRef | null): Pt | null {
+  if (!a || a.lat == null || a.lon == null) return null;
+  return { lat: a.lat, lon: a.lon };
+}
 
-  // Equirectangular, x compressed by cos(lat) so the shape stays honest.
-  const lats = [...points.map((p) => p.lat), station.lat];
-  const lons = [...points.map((p) => p.lon), station.lon];
+function airportName(a: AirportRef | null): string {
+  if (!a) return "Unknown";
+  return a.municipality ?? a.name ?? a.iata ?? a.icao ?? "Unknown";
+}
+
+export function FlightPathMap({
+  origin,
+  destination,
+  current,
+  station,
+}: {
+  origin: AirportRef | null;
+  destination: AirportRef | null;
+  current: Pt;
+  station: Pt;
+}) {
+  const from = airportPoint(origin);
+  const to = airportPoint(destination);
+  if (!from && !to) return null;
+
+  // Flown leg: origin to where it is now. Remaining leg: now to destination.
+  const flown = from ? greatCircle(from, current) : [];
+  const remaining = to ? greatCircle(current, to) : [];
+  const all = [...flown, ...remaining, current, station];
+
+  const lats = all.map((p) => p.lat);
+  const lons = all.map((p) => p.lon);
   const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
   const kx = Math.cos(toRad(midLat)) || 1e-6;
 
@@ -49,24 +98,19 @@ export function FlightPathMap({
   const offX = (W - spanX * scale) / 2;
   const offY = (H - spanY * scale) / 2;
 
-  const project = (lat: number, lon: number) => ({
-    x: (lon * kx - minX) * scale + offX,
-    y: (-lat - minY) * scale + offY,
+  const project = (p: Pt) => ({
+    x: (p.lon * kx - minX) * scale + offX,
+    y: (-p.lat - minY) * scale + offY,
   });
 
-  const poly = points
-    .map((p) => {
-      const { x, y } = project(p.lat, p.lon);
+  const toPoly = (pts: Pt[]) =>
+    pts.map((p) => {
+      const { x, y } = project(p);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+    }).join(" ");
 
-  const start = project(points[0].lat, points[0].lon);
-  const end = project(
-    points[points.length - 1].lat,
-    points[points.length - 1].lon,
-  );
-  const home = project(station.lat, station.lon);
+  const here = project(current);
+  const home = project(station);
 
   return (
     <figure className="m-0">
@@ -74,38 +118,68 @@ export function FlightPathMap({
         viewBox={`0 0 ${W} ${H}`}
         className="block h-auto w-full"
         role="img"
-        aria-label={`Flight path from ${originLabel ?? "its origin"} to the current position`}
+        aria-label={`Route from ${airportName(origin)} to ${airportName(destination)}`}
       >
-        <polyline
-          points={poly}
-          fill="none"
-          stroke="var(--accent)"
-          strokeWidth={2}
-          strokeOpacity={0.55}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {flown.length > 1 && (
+          <polyline
+            points={toPoly(flown)}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth={2}
+            strokeOpacity={0.7}
+            strokeLinecap="round"
+          />
+        )}
+        {remaining.length > 1 && (
+          <polyline
+            points={toPoly(remaining)}
+            fill="none"
+            stroke="var(--text-dim)"
+            strokeWidth={2}
+            strokeOpacity={0.55}
+            strokeDasharray="6 6"
+            strokeLinecap="round"
+          />
+        )}
 
-        {/* origin */}
-        <circle cx={start.x} cy={start.y} r={4.5} fill="none" stroke="var(--text-dim)" strokeWidth={2} />
+        {from && (
+          <circle
+            cx={project(from).x}
+            cy={project(from).y}
+            r={4.5}
+            fill="none"
+            stroke="var(--text-dim)"
+            strokeWidth={2}
+          />
+        )}
+        {to && (
+          <circle
+            cx={project(to).x}
+            cy={project(to).y}
+            r={4.5}
+            fill="none"
+            stroke="var(--text-dim)"
+            strokeWidth={2}
+          />
+        )}
 
         {/* your station */}
-        <g>
-          <circle cx={home.x} cy={home.y} r={9} fill="none" stroke="var(--alert)" strokeWidth={1.5} strokeDasharray="3 4" />
-          <circle cx={home.x} cy={home.y} r={2.5} fill="var(--alert)" />
-        </g>
+        <circle cx={home.x} cy={home.y} r={9} fill="none" stroke="var(--alert)" strokeWidth={1.5} strokeDasharray="3 4" />
+        <circle cx={home.x} cy={home.y} r={2.5} fill="var(--alert)" />
 
         {/* current position */}
-        <circle cx={end.x} cy={end.y} r={5.5} fill="var(--accent)" />
+        <circle cx={here.x} cy={here.y} r={5.5} fill="var(--accent)" />
       </svg>
 
       <figcaption className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--text-faint)]">
         <span>
-          <span className="text-[var(--text-dim)]">Track from</span>{" "}
-          {originLabel ??
-            `${points[0].lat.toFixed(2)}, ${points[0].lon.toFixed(2)}`}
+          <span className="text-[var(--text-dim)]">Flown</span>{" "}
+          {airportName(origin)}
         </span>
-        <span>{points.length} points</span>
+        <span>
+          <span className="text-[var(--text-dim)]">Remaining</span>{" "}
+          {airportName(destination)}
+        </span>
       </figcaption>
     </figure>
   );

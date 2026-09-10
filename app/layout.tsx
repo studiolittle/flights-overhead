@@ -11,7 +11,7 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "Flights Overhead",
   description:
-    "Live radar of aircraft passing over a fixed point, powered by the OpenSky Network.",
+    "An arrivals board for the aircraft passing over your house: what it is, and where it came from.",
 };
 
 export default function RootLayout({

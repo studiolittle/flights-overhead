@@ -1,16 +1,26 @@
 import { NextResponse } from "next/server";
-import { fetchStates, type RawState } from "@/lib/opensky";
-import { haversineKm, bearingDeg, toRad } from "@/lib/geo";
+import { fetchNearby, type AdsbAircraft } from "@/lib/adsblol";
+import { haversineKm, bearingDeg } from "@/lib/geo";
 import { enrichMany } from "@/lib/enrich";
 import { classifyPhase } from "@/lib/classify";
 import { DEFAULT_STATION } from "@/lib/config";
-import type { ApiResponse, Contact } from "@/lib/types";
-
-/** How many of the nearest contacts get an airframe/route lookup per poll. */
-const ENRICH_LIMIT = 10;
+import type { ApiResponse, Contact, Enrichment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/** How many of the nearest contacts get an operator/route lookup per poll. */
+const ENRICH_LIMIT = 10;
+
+const MIN_RANGE_KM = 3;
+const MAX_RANGE_KM = 80;
+
+/** Nothing airborne is doing under ~58 kt, so this filters ground traffic. */
+const MIN_AIRBORNE_MS = 30;
+
+const FT_TO_M = 0.3048;
+const KT_TO_MS = 0.514444;
+const FPM_TO_MS = 0.00508;
 
 function num(value: string | undefined | null, fallback: number): number {
   // Number(null) and Number("") are both 0, which is a legitimate coordinate,
@@ -19,9 +29,6 @@ function num(value: string | undefined | null, fallback: number): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
-
-const MIN_RANGE_KM = 3;
-const MAX_RANGE_KM = 80;
 
 function clampRange(km: number): number {
   return Math.min(MAX_RANGE_KM, Math.max(MIN_RANGE_KM, km));
@@ -33,45 +40,71 @@ const DEFAULT_LON = num(process.env.HOME_LON, DEFAULT_STATION.lon);
 const DEFAULT_RANGE_KM = clampRange(num(process.env.RADAR_RANGE_KM, 10));
 const OVERHEAD_KM = Math.max(0.5, num(process.env.OVERHEAD_RADIUS_KM, 2.5));
 
-// The query box is wider than the visible scope so aircraft about to enter
-// range are already tracked and can be dead-reckoned in smoothly.
+// Query wider than the visible scope so aircraft about to enter range are
+// already tracked and can be dead-reckoned in smoothly.
 const QUERY_BUFFER = 1.35;
 
-// Serve the same upstream snapshot to every client/tab for a few seconds to
-// protect the OpenSky quota. Keyed by station + range.
+// Serve the same upstream snapshot to every client for a few seconds.
 const CACHE_TTL_MS = 9000;
 const payloadCache = new Map<string, { at: number; data: ApiResponse }>();
 
-function mapState(s: RawState): Contact | null {
-  const icao24 = String(s[0] ?? "").trim();
-  const lon = s[5] as number | null;
-  const lat = s[6] as number | null;
-  if (!icao24 || lat == null || lon == null) return null;
+/** Convert one feed record into our internal (metric) shape. */
+function mapAircraft(a: AdsbAircraft): Contact | null {
+  const icao24 = (a.hex ?? "").trim().toLowerCase();
+  if (!icao24 || a.lat == null || a.lon == null) return null;
 
-  const callsign = (s[1] as string | null)?.trim();
+  // alt_baro is the string "ground" for surface traffic.
+  const onGround = a.alt_baro === "ground";
+  if (onGround) return null;
+
+  const altFt = typeof a.alt_baro === "number" ? a.alt_baro : null;
+  const geomFt = typeof a.alt_geom === "number" ? a.alt_geom : null;
+  const callsign = a.flight?.trim();
 
   return {
     id: icao24,
     icao24,
     callsign: callsign && callsign.length > 0 ? callsign : "UNKNOWN",
-    originCountry: String(s[2] ?? "").trim() || "Unknown",
-    lat,
-    lon,
-    baroAltitudeM: (s[7] as number | null) ?? null,
-    geoAltitudeM: (s[13] as number | null) ?? null,
-    onGround: Boolean(s[8]),
-    velocityMs: (s[9] as number | null) ?? null,
-    trackDeg: (s[10] as number | null) ?? null,
-    verticalRateMs: (s[11] as number | null) ?? null,
-    squawk: (s[14] as string | null) ?? null,
-    lastContact: (s[4] as number | null) ?? null,
-    timePosition: (s[3] as number | null) ?? null,
-    positionSource: (s[16] as number | null) ?? null,
-    category: (s[17] as number | null) ?? null,
+    lat: a.lat,
+    lon: a.lon,
+    baroAltitudeM: altFt != null ? altFt * FT_TO_M : null,
+    geoAltitudeM: geomFt != null ? geomFt * FT_TO_M : null,
+    velocityMs: a.gs != null ? a.gs * KT_TO_MS : null,
+    trackDeg: a.track ?? null,
+    verticalRateMs: a.baro_rate != null ? a.baro_rate * FPM_TO_MS : null,
+    squawk: a.squawk ?? null,
+    seenPosS: a.seen_pos ?? null,
+    category: a.category ?? null,
     distanceKm: 0,
     bearingDeg: 0,
     enrichment: null,
     phase: "unknown",
+  };
+}
+
+/**
+ * The live feed already knows the registration and type code, so every
+ * aircraft gets at least that even when adsbdb has no record of it.
+ */
+function mergeEnrichment(
+  feed: AdsbAircraft,
+  looked: Enrichment | null,
+): Enrichment | null {
+  const registration = looked?.registration ?? feed.r ?? null;
+  const icaoType = looked?.icaoType ?? feed.t ?? null;
+  if (!looked && !registration && !icaoType) return null;
+
+  return {
+    type: looked?.type ?? null,
+    icaoType,
+    manufacturer: looked?.manufacturer ?? null,
+    registration,
+    owner: looked?.owner ?? null,
+    photoThumbUrl: looked?.photoThumbUrl ?? null,
+    airlineName: looked?.airlineName ?? null,
+    callsignIata: looked?.callsignIata ?? null,
+    origin: looked?.origin ?? null,
+    destination: looked?.destination ?? null,
   };
 }
 
@@ -94,8 +127,6 @@ export async function GET(request: Request) {
     OVERHEAD_KM,
     Math.min(OVERHEAD_KM * 4, rangeKm * 0.2),
   );
-  // Only describe the station in words when it is the built-in default; a
-  // client-supplied position already knows its own label.
   const isBuiltInDefault = !hasStationParam && !HAS_ENV_HOME;
 
   const cacheKey = `${lat.toFixed(3)}:${lon.toFixed(3)}:${rangeKm}`;
@@ -104,18 +135,9 @@ export async function GET(request: Request) {
     return NextResponse.json(cached.data);
   }
 
-  const dLat = (rangeKm * QUERY_BUFFER) / 111.32;
-  const dLon = (rangeKm * QUERY_BUFFER) / (111.32 * Math.cos(toRad(lat)) || 1e-6);
-  const bbox = {
-    lamin: lat - dLat,
-    lamax: lat + dLat,
-    lomin: lon - dLon,
-    lomax: lon + dLon,
-  };
-
   const base = {
     fetchedAt: now,
-    source: "OpenSky Network",
+    source: "adsb.lol",
     home: { lat, lon },
     homeLabel: isBuiltInDefault ? DEFAULT_STATION.label : null,
     homeQuery: isBuiltInDefault ? DEFAULT_STATION.query : null,
@@ -124,47 +146,55 @@ export async function GET(request: Request) {
   };
 
   try {
-    const { time, states, auth } = await fetchStates(bbox);
+    const { now: snapshotAt, aircraft } = await fetchNearby(
+      lat,
+      lon,
+      rangeKm * QUERY_BUFFER,
+    );
 
-    const inRange = states
-      .map(mapState)
+    // Keep the raw record alongside so registration/type can be merged later.
+    const inRange = aircraft
+      .map((a) => ({ feed: a, contact: mapAircraft(a) }))
       .filter(
-        (c): c is Contact =>
-          c !== null &&
-          !c.onGround &&
-          // OpenSky's on_ground flag is unreliable, so taxiing aircraft and
-          // airport ground vehicles slip through. Nothing airborne is doing
-          // under ~58 kt, so speed is the more dependable filter.
-          (c.velocityMs == null || c.velocityMs >= 30),
+        (x): x is { feed: AdsbAircraft; contact: Contact } =>
+          x.contact !== null &&
+          (x.contact.velocityMs == null ||
+            x.contact.velocityMs >= MIN_AIRBORNE_MS),
       )
-      .map((c) => ({
-        ...c,
-        distanceKm: haversineKm(lat, lon, c.lat, c.lon),
-        bearingDeg: bearingDeg(lat, lon, c.lat, c.lon),
+      .map((x) => ({
+        feed: x.feed,
+        contact: {
+          ...x.contact,
+          distanceKm: haversineKm(lat, lon, x.contact.lat, x.contact.lon),
+          bearingDeg: bearingDeg(lat, lon, x.contact.lat, x.contact.lon),
+        },
       }))
-      .filter((c) => c.distanceKm <= rangeKm * QUERY_BUFFER)
-      .sort((a, b) => a.distanceKm - b.distanceKm);
+      .filter((x) => x.contact.distanceKm <= rangeKm * QUERY_BUFFER)
+      .sort((a, b) => a.contact.distanceKm - b.contact.distanceKm);
 
-    // Airframe + route for the nearest contacts. Cached in module memory, so
-    // this is usually zero network calls after the first sighting.
-    const enrichments = await enrichMany(
-      inRange.map((c) => ({ icao24: c.icao24, callsign: c.callsign })),
+    const lookups = await enrichMany(
+      inRange.map((x) => ({
+        icao24: x.contact.icao24,
+        callsign: x.contact.callsign,
+      })),
       ENRICH_LIMIT,
     );
 
-    const contacts = inRange.map((c) => {
-      const enrichment = enrichments.get(c.icao24) ?? null;
+    const contacts = inRange.map(({ feed, contact }) => {
+      const enrichment = mergeEnrichment(
+        feed,
+        lookups.get(contact.icao24) ?? null,
+      );
       return {
-        ...c,
+        ...contact,
         enrichment,
-        phase: classifyPhase({ ...c, enrichment }, lat, lon),
+        phase: classifyPhase({ ...contact, enrichment }, lat, lon),
       };
     });
 
     const data: ApiResponse = {
       ...base,
-      updatedAt: (time || Math.floor(now / 1000)) * 1000,
-      auth,
+      updatedAt: snapshotAt,
       contacts,
       count: contacts.length,
       stale: false,
@@ -176,7 +206,7 @@ export async function GET(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown upstream error";
 
-    // Keep the last good snapshot on screen rather than blanking the scope.
+    // Keep the last good snapshot on screen rather than blanking the board.
     if (cached) {
       return NextResponse.json({
         ...cached.data,
@@ -189,7 +219,6 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ...base,
       updatedAt: now,
-      auth: "anonymous",
       contacts: [],
       count: 0,
       stale: true,

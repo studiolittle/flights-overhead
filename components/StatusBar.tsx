@@ -5,7 +5,6 @@ import { ageLabel } from "@/lib/format";
 
 export function StatusBar({
   source,
-  auth,
   snapshotAt,
   count,
   rangeKm,
@@ -16,7 +15,6 @@ export function StatusBar({
   nowTs,
 }: {
   source: string;
-  auth: string;
   snapshotAt: number | null;
   count: number;
   rangeKm: number;
@@ -36,7 +34,7 @@ export function StatusBar({
           weight="bold"
           className={stale ? "opacity-40" : "live-dot"}
         />
-        {source.toUpperCase()} · {auth === "authenticated" ? "LIVE" : "ANON"}
+        {source.toUpperCase()} · LIVE
       </span>
       <span>SNAPSHOT {age} AGO</span>
       <span>CONTACTS {String(count).padStart(2, "0")}</span>

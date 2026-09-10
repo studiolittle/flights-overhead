@@ -11,7 +11,7 @@ import {
 import { PHASE_LABEL } from "@/lib/classify";
 import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
 import { compass16, flightLevel, msToFpm, msToKt, pad } from "@/lib/format";
-import type { Contact, FlightPhase, TrackResponse } from "@/lib/types";
+import type { Contact, FlightPhase } from "@/lib/types";
 import { FlightPathMap } from "./FlightPathMap";
 
 const PHASE_COLOR: Record<FlightPhase, string> = {
@@ -64,16 +64,12 @@ export function FlightBoard({
   overhead,
   pinned,
   onClear,
-  track,
-  trackLoading,
   station,
 }: {
   contact: Contact | null;
   overhead: boolean;
   pinned: boolean;
   onClear: () => void;
-  track: TrackResponse | null;
-  trackLoading: boolean;
   station: { lat: number; lon: number };
 }) {
   if (!contact) {
@@ -174,8 +170,9 @@ export function FlightBoard({
               {typeLine || "Aircraft type unavailable"}
             </p>
             <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-              {contact.callsign} · {contact.icao24.toUpperCase()} ·{" "}
-              {contact.originCountry}
+              {[contact.callsign, contact.icao24.toUpperCase(), category]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
           {e?.photoThumbUrl && (
@@ -230,37 +227,16 @@ export function FlightBoard({
           />
         </div>
 
-        {/* Real flight path */}
-        {trackLoading && (
-          <p className="text-[11px] tracking-[0.15em] text-[var(--text-faint)]">
-            LOADING FLIGHT PATH...
-          </p>
-        )}
-        {!trackLoading && track && track.path.length >= 2 && (
+        {/* Route: where it has come from and where it is going */}
+        {(e?.origin || e?.destination) && (
           <div className="border-t border-[var(--line)] pt-4">
             <FlightPathMap
-              path={track.path}
+              origin={e?.origin ?? null}
+              destination={e?.destination ?? null}
+              current={{ lat: contact.lat, lon: contact.lon }}
               station={station}
-              /* Prefer the filed origin airport; a track can start over
-                 water, where reverse geocoding has nothing to name. */
-              originLabel={
-                e?.origin?.municipality ??
-                e?.origin?.name ??
-                track.origin?.label ??
-                null
-              }
             />
           </div>
-        )}
-        {!trackLoading && track && track.path.length < 2 && (
-          <p className="border-t border-[var(--line)] pt-4 text-[11px] text-[var(--text-faint)]">
-            No recorded track for this aircraft yet.
-          </p>
-        )}
-        {!pinned && !track && !trackLoading && (
-          <p className="border-t border-[var(--line)] pt-4 text-[11px] text-[var(--text-faint)]">
-            Select this flight to load its full path.
-          </p>
         )}
       </div>
     </div>

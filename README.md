@@ -14,8 +14,9 @@ every time you hear one.
   can leave the tab in the background.
 - **Passed overhead log** of everything that has flown over, kept in your
   browser.
-- **Real flight paths.** Click any flight to load its recorded track and see
-  where it actually came from, drawn origin-to-here and clipped onto the radar.
+- **Route map.** A great-circle line showing the leg already flown from the
+  origin airport and the leg remaining to the destination, with your station
+  marked on it.
 - **Postal code field.** Type `M5V 3L9`, `90210`, `SW1A 1AA` or a place name.
   Saved locally, so it sticks.
 - **Range presets** of 5 / 10 / 25 / 50 km.
@@ -35,24 +36,26 @@ credentials off the client and cache aggressively:
 
 | Route | Purpose |
 | --- | --- |
-| `/api/flights` | OpenSky state vectors, plus range/bearing, airframe, route and phase |
-| `/api/track` | OpenSky recorded track for one aircraft, on demand only |
+| `/api/flights` | Live positions, plus range/bearing, airframe, route and phase |
 | `/api/geocode` | Postal code / place name to coordinates |
 
 ### Data sources
 
-- **[OpenSky Network](https://opensky-network.org/)** for live positions and
-  recorded tracks.
-- **[adsbdb](https://www.adsbdb.com/)** for aircraft type, registration, owner,
-  photo and flight route. OpenSky's own aircraft-metadata endpoint returns
-  `410 Gone`, so this is what makes "what type is it, where is it going"
-  possible. [hexdb](https://hexdb.io/) is the fallback for airframe data.
+- **[adsb.lol](https://adsb.lol/)** for live positions. Free, no key, queries by
+  radius, and includes registration and ICAO type code inline.
+- **[adsbdb](https://www.adsbdb.com/)** for the operator, full type name, photo
+  and flight route. [hexdb](https://hexdb.io/) is the airframe fallback.
 - **[Nominatim](https://nominatim.openstreetmap.org/)** for postal codes, with
   [Zippopotam](https://zippopotam.us/) as a CA/US fallback.
 
 Lookups are cached in memory (an aircraft's type never changes, a callsign's
 route is stable for months), so steady-state polling costs almost no extra
 requests.
+
+**Why not OpenSky?** It was the original feed and works fine from a home
+connection, but its network silently drops traffic from cloud IP ranges: every
+request from Vercel fails with a TCP connect timeout, in US and EU regions
+alike. adsb.lol works from anywhere and carries more per-aircraft detail.
 
 ## Local setup
 
@@ -81,31 +84,17 @@ All optional, all in `.env.local` (see `.env.example`):
 | `HOME_LAT` / `HOME_LON` | K2G 6P3, Nepean ON | Fallback before a postal code is set; see `lib/config.ts`. |
 | `RADAR_RANGE_KM` | `10` | Default range. |
 | `OVERHEAD_RADIUS_KM` | `2.5` | What counts as "overhead". |
-| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `40000` | Refresh interval, min 15000. At 40s a tab left open all day uses about half the authenticated OpenSky quota. |
-| `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` | _(none)_ | See below. |
+| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `40000` | Refresh interval, min 15000. |
 
-### OpenSky credentials
-
-Anonymous access works but is limited to a few hundred requests per day per IP,
-so you will see `FEED STALE` before long. To get a proper quota:
-
-1. Create a free account at <https://opensky-network.org/>.
-2. Account → **API clients** → create a client.
-3. Set `OPENSKY_CLIENT_ID` and `OPENSKY_CLIENT_SECRET`.
-
-The server exchanges these for a short-lived OAuth2 token, cached in memory.
-Basic auth with username and password is no longer supported by OpenSky.
+There are no API keys. Every upstream this uses is free and open.
 
 ## Deploy to Vercel
 
 Import <https://github.com/studiolittle/flights-overhead> at
 [vercel.com/new](https://vercel.com/new). Next.js is detected automatically and
 the defaults are correct, including **Root Directory** `./` (this repo is the
-project root). Add the environment variables above under
-**Settings → Environment Variables** if you want OpenSky credentials, then
-deploy. Every push to `main` redeploys.
-
-Notifications need HTTPS, which Vercel provides.
+project root). No environment variables are required. Every push to `main`
+redeploys.
 
 Notifications need HTTPS, which Vercel provides. Grant permission with the
 **ALERTS** toggle; browsers only allow that request from a real click.
@@ -114,9 +103,11 @@ Notifications need HTTPS, which Vercel provides. Grant permission with the
 
 - Altitude is barometric (above sea level), not height above your roof.
 - A route is only as good as the filed callsign. General aviation and private
-  flights usually have none, so they fall back to the vertical profile.
-- Aircraft slower than ~58 kt are filtered out: OpenSky's `on_ground` flag is
-  unreliable and taxiing aircraft would otherwise appear to be flying over.
+  flights usually have none, and an airline callsign can carry a stale route
+  from a different leg, so an aircraft below ~6,500 ft is classified from its
+  climb or descent rather than its filed route.
+- Aircraft slower than ~58 kt are filtered out, since ground vehicles and
+  taxiing aircraft would otherwise appear to be flying over.
 - The passed-overhead log lives in your browser only, and is capped at 40
   entries.
 - All motion respects `prefers-reduced-motion`.

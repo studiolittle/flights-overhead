@@ -12,12 +12,7 @@ import {
   requestNotifyPermission,
   type NotifyState,
 } from "@/lib/notify";
-import type {
-  ApiResponse,
-  Contact,
-  Station,
-  TrackResponse,
-} from "@/lib/types";
+import type { ApiResponse, Contact, Station } from "@/lib/types";
 import { StationControls } from "./StationControls";
 import { FlightBoard } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
@@ -26,9 +21,9 @@ import { RadarScope } from "./RadarScope";
 import { StatusBar } from "./StatusBar";
 
 /**
- * 40s keeps a tab left open all day at roughly half the authenticated OpenSky
- * daily quota (~2,160 requests vs a ~4,000 limit). Dead reckoning moves the
- * blips between polls, so the board still reads as live.
+ * 40s is easy on a free community feed: a tab left open all day makes ~2,160
+ * requests. Dead reckoning moves the blips between polls, so the board still
+ * reads as live.
  */
 const POLL_MS = Math.max(
   15_000,
@@ -75,9 +70,6 @@ export function RadarConsole() {
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [track, setTrack] = useState<TrackResponse | null>(null);
-  const [trackLoading, setTrackLoading] = useState(false);
-
   const [log, setLog] = useState<LogEntry[]>([]);
   const [notify, setNotify] = useState<NotifyState>("default");
 
@@ -85,7 +77,6 @@ export function RadarConsole() {
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const pollAbort = useRef<AbortController | null>(null);
-  const trackAbort = useRef<AbortController | null>(null);
   /** icao24 -> last alert time, so one pass does not alert repeatedly. */
   const alerted = useRef<Map<string, number>>(new Map());
 
@@ -263,42 +254,6 @@ export function RadarConsole() {
     }
   }, [data]);
 
-  // --- flight path for the board -------------------------------------------
-  const trackTargetId = pinned
-    ? selectedId
-    : boardOverhead
-      ? (boardContact?.id ?? null)
-      : null;
-
-  useEffect(() => {
-    if (!trackTargetId) {
-      setTrack(null);
-      setTrackLoading(false);
-      return;
-    }
-    trackAbort.current?.abort();
-    const ac = new AbortController();
-    trackAbort.current = ac;
-    setTrackLoading(true);
-
-    fetch(`/api/track?icao24=${trackTargetId}`, {
-      signal: ac.signal,
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((json: TrackResponse) => {
-        setTrack(json);
-        setTrackLoading(false);
-      })
-      .catch((err) => {
-        if ((err as Error).name === "AbortError") return;
-        setTrack(null);
-        setTrackLoading(false);
-      });
-
-    return () => ac.abort();
-  }, [trackTargetId]);
-
   // --- actions --------------------------------------------------------------
   const applyStation = useCallback(async (query: string) => {
     setResolving(true);
@@ -321,7 +276,6 @@ export function RadarConsole() {
       setStation(next);
       writeStore(KEY_STATION, next);
       setSelectedId(null);
-      setTrack(null);
       alerted.current.clear();
     } catch {
       setGeoError("Location lookup failed.");
@@ -362,7 +316,7 @@ export function RadarConsole() {
           </h1>
         </div>
         <span className="hidden text-[11px] tracking-[0.2em] text-[var(--text-dim)] sm:block">
-          LIVE ADS-B · OPENSKY + ADSBDB
+          LIVE ADS-B · ADSB.LOL + ADSBDB
         </span>
       </header>
 
@@ -388,8 +342,7 @@ export function RadarConsole() {
           />
 
           <StatusBar
-            source={data?.source ?? "OpenSky Network"}
-            auth={data?.auth ?? "anonymous"}
+            source={data?.source ?? "adsb.lol"}
             snapshotAt={data?.updatedAt ?? null}
             count={live.length}
             rangeKm={effectiveRange}
@@ -409,8 +362,6 @@ export function RadarConsole() {
                 overhead={boardOverhead}
                 pinned={pinned}
                 onClear={() => setSelectedId(null)}
-                track={track}
-                trackLoading={trackLoading}
                 station={home}
               />
               <InRangeList
@@ -431,7 +382,6 @@ export function RadarConsole() {
                   loading={loading}
                   selectedId={selectedId}
                   onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
-                  trackPoints={track?.path ?? null}
                 />
               </section>
               <OverheadLog entries={log} onClear={clearLog} />

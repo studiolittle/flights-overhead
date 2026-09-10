@@ -1,8 +1,7 @@
 "use client";
 
-import { bearingDeg, haversineKm } from "@/lib/geo";
 import { flightLevel, metersToFt } from "@/lib/format";
-import type { Contact, FlightPhase, TrackPoint } from "@/lib/types";
+import type { Contact, FlightPhase } from "@/lib/types";
 
 const SIZE = 1000;
 const C = SIZE / 2;
@@ -30,7 +29,6 @@ export function RadarScope({
   loading,
   selectedId,
   onSelect,
-  trackPoints,
 }: {
   contacts: Contact[];
   station: { lat: number; lon: number };
@@ -39,23 +37,8 @@ export function RadarScope({
   loading: boolean;
   selectedId: string | null;
   onSelect: (icao24: string) => void;
-  trackPoints: TrackPoint[] | null;
 }) {
   const overheadR = R_MAX * Math.min(1, overheadRadiusKm / rangeKm);
-
-  // The portion of the selected aircraft's real track that crosses the scope.
-  const trackPoly = (() => {
-    if (!trackPoints || trackPoints.length < 2) return null;
-    const pts: string[] = [];
-    for (const p of trackPoints) {
-      const d = haversineKm(station.lat, station.lon, p.lat, p.lon);
-      if (d > rangeKm) continue;
-      const b = bearingDeg(station.lat, station.lon, p.lat, p.lon);
-      const { x, y } = polar(C, C, (d / rangeKm) * R_MAX, b);
-      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-    }
-    return pts.length >= 2 ? pts.join(" ") : null;
-  })();
 
   return (
     /* overflow-hidden: the sweep is a rotating square whose bounding box grows
@@ -107,19 +90,6 @@ export function RadarScope({
 
         <line x1={C - R_MAX} y1={C} x2={C + R_MAX} y2={C} stroke="var(--grid)" strokeWidth={1} />
         <line x1={C} y1={C - R_MAX} x2={C} y2={C + R_MAX} stroke="var(--grid)" strokeWidth={1} />
-
-        {/* selected aircraft's real path across the scope */}
-        {trackPoly && (
-          <polyline
-            points={trackPoly}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2.5}
-            strokeOpacity={0.5}
-            strokeDasharray="8 6"
-            strokeLinecap="round"
-          />
-        )}
 
         <circle cx={C} cy={C} r={9} fill="none" stroke="var(--accent)" strokeWidth={2} />
         <circle cx={C} cy={C} r={2.5} fill="var(--accent)" />
