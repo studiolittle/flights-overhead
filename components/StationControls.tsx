@@ -35,7 +35,7 @@ export function StationControls({
   }
 
   return (
-    <div className="panel flex flex-col gap-4 px-4 py-3.5 lg:flex-row lg:items-start lg:gap-8">
+    <div className="panel flex flex-col gap-4 px-4 py-3.5">
       {/* Location */}
       <form onSubmit={submit} className="flex flex-col gap-1.5">
         <label
@@ -54,7 +54,7 @@ export function StationControls({
             autoComplete="postal-code"
             spellCheck={false}
             aria-describedby="station-hint"
-            className="field w-[9.5rem] uppercase"
+            className="field w-full uppercase"
           />
           <button type="submit" className="btn" disabled={resolving}>
             {resolving ? "..." : "SET"}
@@ -62,7 +62,7 @@ export function StationControls({
         </div>
         <p
           id="station-hint"
-          className="max-w-[15rem] text-[12px] leading-snug text-ink-faint"
+          className="text-[12px] leading-snug text-ink-faint"
         >
           Your postal code, ZIP or city. Marks your spot on the radar so it can
           flag a flight passing over you.
@@ -70,7 +70,7 @@ export function StationControls({
       </form>
 
       {/* Range */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 border-t border-line pt-4">
         <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">RANGE</span>
         <div className="flex items-center gap-1.5">
           {RANGE_PRESETS.map((km) => (
@@ -86,14 +86,14 @@ export function StationControls({
           ))}
           <span className="ml-1 text-[12.5px] text-ink-faint">KM</span>
         </div>
-        <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
+        <p className="text-[12px] leading-snug text-ink-faint">
           How far around the airport the radar reaches. 25 km covers the whole
           approach.
         </p>
       </div>
 
       {/* Local time, date and resolved location / error */}
-      <div className="flex flex-col gap-1.5 lg:ml-auto">
+      <div className="flex flex-col gap-1.5 border-t border-line pt-4">
         <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">
           LOCAL TIME &amp; LOCATION
         </span>

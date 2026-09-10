@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Broadcast } from "@phosphor-icons/react/dist/ssr";
+import { BeerStein, Broadcast } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact, Station } from "@/lib/types";
@@ -294,26 +294,27 @@ export function RadarConsole() {
         </div>
       </header>
 
+      <div className="panel flex items-start gap-3 px-5 py-4">
+        <BeerStein
+          size={20}
+          weight="bold"
+          className="mt-0.5 shrink-0 text-accent-ink"
+        />
+        <p className="text-[13.5px] leading-relaxed text-ink-dim">
+          Welcome! I built this app for fun, to learn more about the
+          airplanes flying over my head while I&apos;m enjoying a beer in the
+          backyard. I hope you enjoy it and possibly learn something cool
+          about aviation.{" "}
+          <span className="text-ink-faint">&mdash; Jesse</span>
+        </p>
+      </div>
+
       {!mounted ? (
         <div className="panel flex flex-1 items-center justify-center p-8 text-[15px] tracking-[0.2em] text-ink-dim">
           INITIALISING
         </div>
       ) : (
         <>
-          <StationControls
-            /* Remount when the applied station changes so the field shows
-               the value that is actually in effect. */
-            key={station?.query ?? "unset"}
-            query={station?.query ?? ""}
-            stationLabel={station?.label ?? null}
-            rangeKm={rangeKm}
-            onSetStation={applyStation}
-            onSetRange={applyRange}
-            resolving={resolving}
-            error={geoError}
-            nowTs={nowTs}
-          />
-
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
             {/* min-w-0: grid items default to min-width:auto and would
                 otherwise refuse to shrink below their longest text. */}
@@ -336,6 +337,19 @@ export function RadarConsole() {
             </div>
 
             <div className="flex min-w-0 flex-col gap-4">
+              <StationControls
+                /* Remount when the applied station changes so the field
+                   shows the value that is actually in effect. */
+                key={station?.query ?? "unset"}
+                query={station?.query ?? ""}
+                stationLabel={station?.label ?? null}
+                rangeKm={rangeKm}
+                onSetStation={applyStation}
+                onSetRange={applyRange}
+                resolving={resolving}
+                error={geoError}
+                nowTs={nowTs}
+              />
               <section className="panel flex justify-center p-4">
                 {/* Cap the square so it does not balloon to full width on a
                     single-column (tablet / narrow) layout. */}
