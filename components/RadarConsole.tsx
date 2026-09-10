@@ -52,7 +52,7 @@ function writeStore(key: string, value: unknown) {
 export function RadarConsole() {
   const [mounted, setMounted] = useState(false);
   const [station, setStation] = useState<Station | null>(null);
-  const [rangeKm, setRangeKm] = useState(25);
+  const [rangeKm, setRangeKm] = useState(50);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [nowTs, setNowTs] = useState(0);
@@ -330,7 +330,7 @@ export function RadarConsole() {
                 pinned={pinned}
                 onClear={() => setSelectedId(null)}
                 emptyTitle="SIT TIGHT"
-                emptyText={`Open a beer and keep an eye out — there are always more flights coming and going at ${HOME_AIRPORT.name} (${code}). Try 25 km to cover the whole approach.`}
+                emptyText={`Open a beer and keep an eye out — there are always more flights coming and going at ${HOME_AIRPORT.name} (${code}). 50 km covers the whole approach.`}
               />
               <AirportPanel
                 contacts={reckoned}

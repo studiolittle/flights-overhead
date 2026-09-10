@@ -85,9 +85,9 @@ npm run dev
 
 On Windows PowerShell, chain with `;` rather than `&&`.
 
-Open http://localhost:3000. The radar is centred on YOW; it starts with your
-home at **K2G 6P3 (Nepean, Ontario)**, which you can change to any postal code
-or place name. No configuration needed to try it.
+Open http://localhost:3000. The radar is centred on YOW; with no home location
+set it starts on the airport itself, which you can change to any postal code or
+place name. No configuration needed to try it.
 
 Typography is [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk),
 self-hosted via `next/font`, with tabular figures so the live readouts do not
@@ -99,8 +99,8 @@ All optional, all in `.env.local` (see `.env.example`):
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `HOME_LAT` / `HOME_LON` | K2G 6P3, Nepean ON | Your home before a postal code is set; see `lib/config.ts`. Does not move the radar. |
-| `RADAR_RANGE_KM` | `25` | Default radar range, km around YOW. |
+| `HOME_LAT` / `HOME_LON` | YOW | Your home before a postal code is set; see `lib/config.ts`. Does not move the radar. |
+| `RADAR_RANGE_KM` | `50` | Default radar range, km around YOW. |
 | `OVERHEAD_RADIUS_KM` | `2.5` | How close to home counts as "overhead". |
 | `NEXT_PUBLIC_POLL_INTERVAL_MS` | `40000` | Refresh interval, min 15000. |
 

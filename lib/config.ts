@@ -1,8 +1,8 @@
 import type { HomeAirport, Station } from "./types";
 
 /**
- * The only airport the app shows traffic for. Ottawa Macdonald-Cartier sits
- * ~8 km east of the default station.
+ * The only airport the app shows traffic for, and the point the radar
+ * centres on before anyone sets a home location.
  */
 export const HOME_AIRPORT: HomeAirport = {
   iata: "YOW",
@@ -41,15 +41,13 @@ export const HOME_AIRPORT: HomeAirport = {
 export const AIRPORT_VIEW_KM = 12;
 
 /**
- * Where the radar points before anyone types a postal code.
- *
- * Coordinates are the K2G forward-sortation-area centroid, which is accurate
- * enough for a station: the scope is kilometres wide. Override per-deployment
- * with HOME_LAT / HOME_LON, or just type a postal code in the app.
+ * Where the radar points before anyone sets a home location: the airport
+ * itself. Override per-deployment with HOME_LAT / HOME_LON, or just type a
+ * postal code in the app.
  */
 export const DEFAULT_STATION: Station = {
-  lat: 45.3286,
-  lon: -75.7703,
-  label: "Nepean, Ontario",
-  query: "K2G 6P3",
+  lat: HOME_AIRPORT.lat,
+  lon: HOME_AIRPORT.lon,
+  label: `${HOME_AIRPORT.name} airport (${HOME_AIRPORT.iata})`,
+  query: null,
 };

@@ -50,7 +50,7 @@ export function StationControls({
             name="station"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="K2G 6P3"
+            placeholder="K1V 9B4"
             autoComplete="postal-code"
             spellCheck={false}
             aria-describedby="station-hint"
@@ -87,7 +87,7 @@ export function StationControls({
           <span className="ml-1 text-[12.5px] text-ink-faint">KM</span>
         </div>
         <p className="text-[12px] leading-snug text-ink-faint">
-          How far around the airport the radar reaches. 25 km covers the whole
+          How far around the airport the radar reaches. 50 km covers the whole
           approach.
         </p>
       </div>

@@ -41,7 +41,7 @@ function clampRange(km: number): number {
 const HAS_ENV_HOME = Boolean(process.env.HOME_LAT && process.env.HOME_LON);
 const DEFAULT_LAT = num(process.env.HOME_LAT, DEFAULT_STATION.lat);
 const DEFAULT_LON = num(process.env.HOME_LON, DEFAULT_STATION.lon);
-const DEFAULT_RANGE_KM = clampRange(num(process.env.RADAR_RANGE_KM, 25));
+const DEFAULT_RANGE_KM = clampRange(num(process.env.RADAR_RANGE_KM, 50));
 const OVERHEAD_KM = Math.max(0.5, num(process.env.OVERHEAD_RADIUS_KM, 2.5));
 
 // Query wider than the visible scope so aircraft about to enter range are
