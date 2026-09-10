@@ -1,19 +1,52 @@
 /** What this aircraft is doing relative to your station. */
 export type FlightPhase = "arriving" | "departing" | "overflight" | "unknown";
 
-/**
- * `airport`: only flights landing at or taking off from the home airport.
- * `all`: everything in range, overflights included.
- */
-export type TrafficFilter = "airport" | "all";
+export interface RunwayEnd {
+  /** Painted number, e.g. "25". */
+  ident: string;
+  lat: number;
+  lon: number;
+  /** Heading flown along the runway from this threshold, degrees TRUE. */
+  headingDeg: number;
+}
+
+export interface Runway {
+  lengthFt: number;
+  ends: [RunwayEnd, RunwayEnd];
+}
 
 export interface HomeAirport {
   iata: string;
   icao: string;
   /** Short place name for copy, e.g. "Ottawa". */
   name: string;
+  /** Aerodrome reference point: the centre of the airport panel. */
   lat: number;
   lon: number;
+  runways: Runway[];
+}
+
+/** Surface wind. Direction is TRUE, as a METAR reports it. */
+export interface Wind {
+  /** Where the wind blows FROM. Null when variable. */
+  dirDeg: number | null;
+  speedKt: number;
+  gustKt: number | null;
+}
+
+export interface WeatherResponse {
+  station: string;
+  /** Observation time, ms epoch. */
+  observedAt: number | null;
+  raw: string | null;
+  wind: Wind | null;
+  tempC: number | null;
+  /** As reported, e.g. "15" or "10+", statute miles. */
+  visibilitySm: string | null;
+  altimeterHpa: number | null;
+  /** VFR / MVFR / IFR / LIFR. */
+  flightCategory: string | null;
+  error: string | null;
 }
 
 export interface AirportRef {
@@ -43,6 +76,11 @@ export interface Enrichment {
   callsignIata: string | null;
   origin: AirportRef | null;
   destination: AirportRef | null;
+  /**
+   * The filed route, e.g. "EWR → ROC", when it contradicted how the flight is
+   * actually flying at YOW and was replaced. Absent otherwise.
+   */
+  staleRoute?: string | null;
 }
 
 export interface Contact {
@@ -67,6 +105,12 @@ export interface Contact {
   bearingDeg: number;
   enrichment: Enrichment | null;
   phase: FlightPhase;
+  /**
+   * Set client-side: this aircraft is within the overhead radius of the
+   * user's home. Both scopes centre on the airport, so this can no longer be
+   * read off `distanceKm`.
+   */
+  overhead?: boolean;
 }
 
 export interface ApiResponse {
@@ -85,29 +129,6 @@ export interface ApiResponse {
   contacts: Contact[];
   count: number;
   stale: boolean;
-  error: string | null;
-}
-
-/** One recorded position from an aircraft's trace. */
-export interface TrackPoint {
-  /** Unix seconds. */
-  t: number;
-  lat: number;
-  lon: number;
-  /** Barometric altitude in feet; 0 while on the ground, null if unknown. */
-  altFt: number | null;
-}
-
-export interface TrackResponse {
-  icao24: string;
-  registration: string | null;
-  type: string | null;
-  /** The current leg, downsampled. Empty when no trace is available. */
-  points: TrackPoint[];
-  /** Unix seconds of the first point of the leg. */
-  startedAt: number | null;
-  /** True when the leg starts from a ground fix, i.e. a real departure. */
-  fromGround: boolean;
   error: string | null;
 }
 

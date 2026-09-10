@@ -50,10 +50,10 @@ export function AircraftFacts({
         )}
       </div>
 
-      <h3 className="mt-4 text-[14px] font-medium tracking-[0.01em] text-ink">
+      <h3 className="mt-5 text-[19px] font-semibold tracking-[0.01em] text-ink">
         Interesting facts about this plane
       </h3>
-      <div className="mt-2 flex flex-col gap-3 text-[14px] leading-relaxed text-ink">
+      <div className="mt-2.5 flex flex-col gap-3 text-[14px] leading-relaxed text-ink">
         <p>{f.fact1}</p>
         {f.fact2 && <p>{f.fact2}</p>}
       </div>

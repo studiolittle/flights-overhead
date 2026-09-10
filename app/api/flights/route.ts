@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 import { fetchNearby, type AdsbAircraft } from "@/lib/adsblol";
 import { haversineKm, bearingDeg } from "@/lib/geo";
 import { enrichMany } from "@/lib/enrich";
-import { classifyHomeAirport, classifyPhase, isCruising } from "@/lib/classify";
-import { DEFAULT_STATION, HOME_AIRPORT } from "@/lib/config";
-import type {
-  ApiResponse,
-  Contact,
-  Enrichment,
-  TrafficFilter,
-} from "@/lib/types";
+import {
+  classifyHomeAirport,
+  isCruising,
+  reconcileRoute,
+} from "@/lib/classify";
+import { AIRPORT_VIEW_KM, DEFAULT_STATION, HOME_AIRPORT } from "@/lib/config";
+import type { ApiResponse, Contact, Enrichment } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /** How many of the nearest contacts get an operator/route lookup per poll. */
-const ENRICH_LIMIT = 10;
+const ENRICH_LIMIT = 14;
 
 const MIN_RANGE_KM = 3;
 const MAX_RANGE_KM = 80;
@@ -42,7 +41,7 @@ function clampRange(km: number): number {
 const HAS_ENV_HOME = Boolean(process.env.HOME_LAT && process.env.HOME_LON);
 const DEFAULT_LAT = num(process.env.HOME_LAT, DEFAULT_STATION.lat);
 const DEFAULT_LON = num(process.env.HOME_LON, DEFAULT_STATION.lon);
-const DEFAULT_RANGE_KM = clampRange(num(process.env.RADAR_RANGE_KM, 10));
+const DEFAULT_RANGE_KM = clampRange(num(process.env.RADAR_RANGE_KM, 25));
 const OVERHEAD_KM = Math.max(0.5, num(process.env.OVERHEAD_RADIUS_KM, 2.5));
 
 // Query wider than the visible scope so aircraft about to enter range are
@@ -127,17 +126,12 @@ export async function GET(request: Request) {
   if (!Number.isFinite(lon) || Math.abs(lon) > 180) lon = DEFAULT_LON;
 
   const rangeKm = clampRange(num(params.get("range"), DEFAULT_RANGE_KM));
-  // Overhead radius scales with range so it stays meaningful when zoomed out.
-  const overheadKm = Math.max(
-    OVERHEAD_KM,
-    Math.min(OVERHEAD_KM * 4, rangeKm * 0.2),
-  );
+  // "Overhead" is a fixed radius around the house. The scopes centre on the
+  // airport now, so it no longer scales with the radar range.
+  const overheadKm = OVERHEAD_KM;
   const isBuiltInDefault = !hasStationParam && !HAS_ENV_HOME;
-  // Home-airport traffic unless the client explicitly asks for everything.
-  const filter: TrafficFilter =
-    params.get("filter") === "all" ? "all" : "airport";
 
-  const cacheKey = `${lat.toFixed(3)}:${lon.toFixed(3)}:${rangeKm}:${filter}`;
+  const cacheKey = `${lat.toFixed(3)}:${lon.toFixed(3)}:${rangeKm}`;
   const cached = payloadCache.get(cacheKey);
   if (cached && now - cached.at < CACHE_TTL_MS) {
     return NextResponse.json(cached.data);
@@ -153,15 +147,24 @@ export async function GET(request: Request) {
     overheadRadiusKm: overheadKm,
   };
 
+  // Both scopes centre on the airport: the radar out to `rangeKm`, the airport
+  // panel to a fixed AIRPORT_VIEW_KM. One query, centred on YOW, covers the
+  // wider of the two.
+  const AP = HOME_AIRPORT;
+  const queryKm = Math.max(rangeKm, AIRPORT_VIEW_KM) * QUERY_BUFFER;
+
   try {
     const { now: snapshotAt, aircraft } = await fetchNearby(
-      lat,
-      lon,
-      rangeKm * QUERY_BUFFER,
+      AP.lat,
+      AP.lon,
+      queryKm,
     );
 
     // Keep the raw record alongside so registration/type can be merged later.
-    const inRange = aircraft
+    // `distanceKm` / `bearingDeg` stay relative to the house: the overhead
+    // check and the flight board use them. The radar re-derives its own
+    // airport-relative geometry on the client.
+    const candidates = aircraft
       .map((a) => ({ feed: a, contact: mapAircraft(a) }))
       .filter(
         (x): x is { feed: AdsbAircraft; contact: Contact } =>
@@ -171,21 +174,17 @@ export async function GET(request: Request) {
       )
       .map((x) => ({
         feed: x.feed,
+        apKm: haversineKm(AP.lat, AP.lon, x.contact.lat, x.contact.lon),
         contact: {
           ...x.contact,
           distanceKm: haversineKm(lat, lon, x.contact.lat, x.contact.lon),
           bearingDeg: bearingDeg(lat, lon, x.contact.lat, x.contact.lon),
         },
       }))
-      .filter((x) => x.contact.distanceKm <= rangeKm * QUERY_BUFFER)
-      .sort((a, b) => a.contact.distanceKm - b.contact.distanceKm);
-
-    // Level cruisers can never be home-airport traffic, so drop them before
-    // they use up the enrichment budget meant for the flights we will show.
-    const candidates =
-      filter === "airport"
-        ? inRange.filter((x) => !isCruising(x.contact))
-        : inRange;
+      // Within the wider scope, and not a level cruiser passing high over YOW
+      // (dropped before enrichment so the budget goes to real candidates).
+      .filter((x) => x.apKm <= queryKm && !isCruising(x.contact))
+      .sort((a, b) => a.apKm - b.apKm);
 
     const lookups = await enrichMany(
       candidates.map((x) => ({
@@ -200,11 +199,15 @@ export async function GET(request: Request) {
         ...contact,
         enrichment: mergeEnrichment(feed, lookups.get(contact.icao24) ?? null),
       };
-      if (filter === "all") {
-        return [{ ...enriched, phase: classifyPhase(enriched, lat, lon) }];
-      }
       const phase = classifyHomeAirport(enriched, HOME_AIRPORT);
-      return phase ? [{ ...enriched, phase }] : [];
+      if (!phase) return [];
+      return [
+        {
+          ...enriched,
+          phase,
+          enrichment: reconcileRoute(enriched.enrichment, phase, HOME_AIRPORT),
+        },
+      ];
     });
 
     const data: ApiResponse = {

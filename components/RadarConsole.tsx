@@ -12,13 +12,8 @@ import {
   requestNotifyPermission,
   type NotifyState,
 } from "@/lib/notify";
-import type {
-  ApiResponse,
-  Contact,
-  Station,
-  TrackResponse,
-  TrafficFilter,
-} from "@/lib/types";
+import type { ApiResponse, Contact, Station } from "@/lib/types";
+import { AirportPanel } from "./AirportPanel";
 import { StationControls } from "./StationControls";
 import { FlightBoard } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
@@ -47,7 +42,6 @@ const RENOTIFY_MS = 30 * 60 * 1000;
 
 const KEY_STATION = "fo.station";
 const KEY_RANGE = "fo.range";
-const KEY_FILTER = "fo.filter";
 
 function readStore<T>(key: string): T | null {
   try {
@@ -69,22 +63,18 @@ function writeStore(key: string, value: unknown) {
 export function RadarConsole() {
   const [mounted, setMounted] = useState(false);
   const [station, setStation] = useState<Station | null>(null);
-  const [rangeKm, setRangeKm] = useState(10);
-  const [filter, setFilter] = useState<TrafficFilter>("airport");
+  const [rangeKm, setRangeKm] = useState(25);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notify, setNotify] = useState<NotifyState>("default");
-  const [track, setTrack] = useState<TrackResponse | null>(null);
-  const [trackLoading, setTrackLoading] = useState(false);
 
   const [resolving, setResolving] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const pollAbort = useRef<AbortController | null>(null);
-  const trackAbort = useRef<AbortController | null>(null);
   /** icao24 -> last alert time, so one pass does not alert repeatedly. */
   const alerted = useRef<Map<string, number>>(new Map());
 
@@ -92,13 +82,9 @@ export function RadarConsole() {
   useEffect(() => {
     const storedStation = readStore<Station>(KEY_STATION);
     const storedRange = readStore<number>(KEY_RANGE);
-    const storedFilter = readStore<TrafficFilter>(KEY_FILTER);
 
     if (storedStation) setStation(storedStation);
     if (typeof storedRange === "number") setRangeKm(storedRange);
-    if (storedFilter === "airport" || storedFilter === "all") {
-      setFilter(storedFilter);
-    }
 
     setNotify(notifyState());
     setNowTs(Date.now());
@@ -111,7 +97,7 @@ export function RadarConsole() {
     const ac = new AbortController();
     pollAbort.current = ac;
 
-    const params = new URLSearchParams({ range: String(rangeKm), filter });
+    const params = new URLSearchParams({ range: String(rangeKm) });
     if (station) {
       params.set("lat", String(station.lat));
       params.set("lon", String(station.lon));
@@ -140,7 +126,7 @@ export function RadarConsole() {
       if ((err as Error).name === "AbortError") return;
       setFetchError((err as Error).message || "Network error");
     }
-  }, [rangeKm, station, filter]);
+  }, [rangeKm, station]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -163,7 +149,13 @@ export function RadarConsole() {
   const effectiveRange = data?.rangeKm ?? rangeKm;
   const overheadRadius = data?.overheadRadiusKm ?? 2.5;
 
-  const live: Contact[] = useMemo(() => {
+  /**
+   * Every YOW flight in the snapshot, advanced by dead reckoning. Distance and
+   * bearing are from the house: the flight board and the overhead check work
+   * from these. `overhead` is fixed here because the scopes centre on the
+   * airport and can no longer derive it.
+   */
+  const reckoned: Contact[] = useMemo(() => {
     if (!data) return [];
     const elapsed = Math.min(
       MAX_DR_SECONDS,
@@ -177,35 +169,82 @@ export function RadarConsole() {
           lat = p.lat;
           lon = p.lon;
         }
+        const distanceKm = haversineKm(home.lat, home.lon, lat, lon);
         return {
           ...c,
           lat,
           lon,
-          distanceKm: haversineKm(home.lat, home.lon, lat, lon),
+          distanceKm,
           bearingDeg: bearingDeg(home.lat, home.lon, lat, lon),
+          overhead: distanceKm <= overheadRadius,
         };
       })
-      .filter((c) => c.distanceKm <= effectiveRange)
       .sort((a, b) => a.distanceKm - b.distanceKm);
-  }, [data, nowTs, home.lat, home.lon, effectiveRange]);
+  }, [data, nowTs, home.lat, home.lon, overheadRadius]);
 
-  // What the board shows: your pick, else the most interesting live event.
+  /**
+   * The same contacts placed around the airport, for the radar and the list.
+   * `overhead` (house-relative) rides along from `reckoned`.
+   */
+  const live: Contact[] = useMemo(
+    () =>
+      reckoned
+        .map((c) => ({
+          ...c,
+          distanceKm: haversineKm(
+            HOME_AIRPORT.lat,
+            HOME_AIRPORT.lon,
+            c.lat,
+            c.lon,
+          ),
+          bearingDeg: bearingDeg(
+            HOME_AIRPORT.lat,
+            HOME_AIRPORT.lon,
+            c.lat,
+            c.lon,
+          ),
+        }))
+        .filter((c) => c.distanceKm <= effectiveRange)
+        .sort((a, b) => a.distanceKm - b.distanceKm),
+    [reckoned, effectiveRange],
+  );
+
+  /** The house, as distance and bearing from the airport at the scope centre. */
+  const homeOnRadar = useMemo(
+    () => ({
+      distanceKm: haversineKm(
+        HOME_AIRPORT.lat,
+        HOME_AIRPORT.lon,
+        home.lat,
+        home.lon,
+      ),
+      bearingDeg: bearingDeg(
+        HOME_AIRPORT.lat,
+        HOME_AIRPORT.lon,
+        home.lat,
+        home.lon,
+      ),
+    }),
+    [home.lat, home.lon],
+  );
+
+  // The board headline: your pick, else the most interesting flight. Always
+  // from `reckoned` so its distance reads from the house.
   const pinned = selectedId != null;
   const autoFocus = useMemo(() => {
-    if (live.length === 0) return null;
-    const overheadNow = live.find((c) => c.distanceKm <= overheadRadius);
+    if (reckoned.length === 0) return null;
+    const overheadNow = reckoned.find((c) => c.overhead);
     if (overheadNow) return overheadNow;
-    const meaningful = live.find(
+    const meaningful = reckoned.find(
       (c) => c.phase === "arriving" || c.phase === "departing",
     );
-    return meaningful ?? live[0];
-  }, [live, overheadRadius]);
+    return meaningful ?? reckoned[0];
+  }, [reckoned]);
 
   const boardContact = pinned
-    ? (live.find((c) => c.id === selectedId) ?? null)
+    ? (reckoned.find((c) => c.id === selectedId) ?? null)
     : autoFocus;
-  const boardOverhead =
-    boardContact != null && boardContact.distanceKm <= overheadRadius;
+  const boardOverhead = boardContact?.overhead ?? false;
 
   // --- overhead alerts ----------------------------------------------------
   useEffect(() => {
@@ -246,49 +285,6 @@ export function RadarConsole() {
     }
   }, [data]);
 
-  // --- recorded track for whatever is on the board -------------------------
-  const boardIcao = boardContact?.icao24 ?? null;
-
-  useEffect(() => {
-    if (!boardIcao) {
-      setTrack(null);
-      setTrackLoading(false);
-      return;
-    }
-
-    trackAbort.current?.abort();
-    const ac = new AbortController();
-    trackAbort.current = ac;
-    setTrackLoading(true);
-
-    // Let the board settle before pulling a trace: in auto mode the focused
-    // aircraft can change between polls, and each trace is a real download
-    // from a volunteer-run feed.
-    const timer = setTimeout(() => {
-      fetch(`/api/track?icao24=${boardIcao}`, {
-        signal: ac.signal,
-        cache: "no-store",
-      })
-        .then((r) =>
-          r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-        )
-        .then((json: TrackResponse) => {
-          setTrack(json);
-          setTrackLoading(false);
-        })
-        .catch((err) => {
-          if ((err as Error).name === "AbortError") return;
-          setTrack(null);
-          setTrackLoading(false);
-        });
-    }, 1200);
-
-    return () => {
-      clearTimeout(timer);
-      ac.abort();
-    };
-  }, [boardIcao]);
-
   // --- actions --------------------------------------------------------------
   const applyStation = useCallback(async (query: string) => {
     setResolving(true);
@@ -324,11 +320,8 @@ export function RadarConsole() {
     writeStore(KEY_RANGE, km);
   }, []);
 
-  const applyFilter = useCallback((next: TrafficFilter) => {
-    setFilter(next);
-    writeStore(KEY_FILTER, next);
-    // A pinned flight may not exist under the new filter.
-    setSelectedId(null);
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedId((cur) => (cur === id ? null : id));
   }, []);
 
   const toggleNotify = useCallback(async () => {
@@ -340,7 +333,6 @@ export function RadarConsole() {
   }, []);
 
   const loading = !data && !fetchError;
-  const airportOnly = filter === "airport";
   const code = HOME_AIRPORT.iata;
 
   return (
@@ -380,9 +372,6 @@ export function RadarConsole() {
             rangeKm={rangeKm}
             onSetStation={applyStation}
             onSetRange={applyRange}
-            filter={filter}
-            airportCode={code}
-            onSetFilter={applyFilter}
             resolving={resolving}
             error={geoError}
             notify={notify}
@@ -404,23 +393,21 @@ export function RadarConsole() {
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
             {/* min-w-0: grid items default to min-width:auto and would
                 otherwise refuse to shrink below their longest text. */}
-            <div className="min-w-0">
+            <div className="flex min-w-0 flex-col gap-4">
               <FlightBoard
                 contact={boardContact}
                 overhead={boardOverhead}
                 pinned={pinned}
                 onClear={() => setSelectedId(null)}
+                emptyTitle={`NO ${code} TRAFFIC IN RANGE`}
+                emptyText={`Flights landing at or taking off from ${HOME_AIRPORT.name} (${code}) appear here with their type and route. Try 25 km to cover the whole approach.`}
+              />
+              <AirportPanel
+                contacts={reckoned}
                 station={home}
-                track={track}
-                trackLoading={trackLoading}
-                emptyTitle={
-                  airportOnly ? `NO ${code} TRAFFIC IN RANGE` : "NOTHING IN RANGE"
-                }
-                emptyText={
-                  airportOnly
-                    ? `Flights landing at or taking off from ${HOME_AIRPORT.name} (${code}) appear here with their type and route. Try 25 km to cover the whole approach.`
-                    : "When an aircraft comes within range it appears here with its type and route. Widen the range if your area is quiet."
-                }
+                selectedId={selectedId}
+                onSelect={toggleSelect}
+                nowTs={nowTs || Date.now()}
               />
             </div>
 
@@ -433,35 +420,33 @@ export function RadarConsole() {
                     contacts={live}
                     rangeKm={effectiveRange}
                     overheadRadiusKm={overheadRadius}
+                    home={homeOnRadar}
                     loading={loading}
                     selectedId={selectedId}
-                    onSelect={(id) =>
-                      setSelectedId((cur) => (cur === id ? null : id))
-                    }
+                    onSelect={toggleSelect}
                   />
                 </div>
               </section>
               <InRangeList
                 contacts={live}
                 selectedId={selectedId}
-                overheadRadiusKm={overheadRadius}
-                onSelect={(id) =>
-                  setSelectedId((cur) => (cur === id ? null : id))
-                }
-                title={airportOnly ? `${code} TRAFFIC` : "IN RANGE"}
-                emptyText={
-                  airportOnly
-                    ? `No ${code} arrivals or departures in range.`
-                    : "Nothing overhead right now."
-                }
+                onSelect={toggleSelect}
+                title={`${code} TRAFFIC`}
+                emptyText={`No ${code} arrivals or departures within ${Math.round(effectiveRange)} km.`}
               />
             </div>
           </div>
         </>
       )}
 
-      <footer className="mt-auto border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
-        For fun. Enjoy :)
+      <footer className="mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
+        <span>For fun. Enjoy :)</span>
+        <a
+          href="mailto:info@studiolittle.ca"
+          className="text-ink-dim transition-colors hover:text-accent-ink"
+        >
+          info@studiolittle.ca
+        </a>
       </footer>
     </main>
   );

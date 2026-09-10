@@ -3,7 +3,6 @@
 import { useState, type FormEvent } from "react";
 import { BellRinging, BellSlash, MapPin } from "@phosphor-icons/react/dist/ssr";
 import type { NotifyState } from "@/lib/notify";
-import type { TrafficFilter } from "@/lib/types";
 
 const RANGE_PRESETS = [5, 10, 25, 50] as const;
 
@@ -13,9 +12,6 @@ export function StationControls({
   rangeKm,
   onSetStation,
   onSetRange,
-  filter,
-  airportCode,
-  onSetFilter,
   resolving,
   error,
   notify,
@@ -26,9 +22,6 @@ export function StationControls({
   rangeKm: number;
   onSetStation: (value: string) => void;
   onSetRange: (km: number) => void;
-  filter: TrafficFilter;
-  airportCode: string;
-  onSetFilter: (filter: TrafficFilter) => void;
   resolving: boolean;
   error: string | null;
   notify: NotifyState;
@@ -53,7 +46,7 @@ export function StationControls({
           htmlFor="station"
           className="text-[11.5px] tracking-[0.22em] text-ink-dim"
         >
-          STATION
+          HOME
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -75,7 +68,8 @@ export function StationControls({
           id="station-hint"
           className="max-w-[15rem] text-[12px] leading-snug text-ink-faint"
         >
-          Your postal code, ZIP or city. This is the centre of the radar.
+          Your postal code, ZIP or city. Marks your spot on the radar so it can
+          flag a flight passing over you.
         </p>
       </form>
 
@@ -97,35 +91,8 @@ export function StationControls({
           <span className="ml-1 text-[12.5px] text-ink-faint">KM</span>
         </div>
         <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
-          How wide a circle to watch. Try 25 or 50 if your sky is quiet.
-        </p>
-      </div>
-
-      {/* Traffic filter */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">TRAFFIC</span>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => onSetFilter("airport")}
-            aria-pressed={filter === "airport"}
-            className={`chip ${filter === "airport" ? "chip-on" : ""}`}
-          >
-            {airportCode} ONLY
-          </button>
-          <button
-            type="button"
-            onClick={() => onSetFilter("all")}
-            aria-pressed={filter === "all"}
-            className={`chip ${filter === "all" ? "chip-on" : ""}`}
-          >
-            ALL
-          </button>
-        </div>
-        <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
-          {filter === "airport"
-            ? `Only flights landing at or taking off from ${airportCode}.`
-            : "Everything in range, including planes just passing over."}
+          How far around the airport the radar reaches. 25 km covers the whole
+          approach.
         </p>
       </div>
 

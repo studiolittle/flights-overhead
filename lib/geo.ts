@@ -32,6 +32,12 @@ export function bearingDeg(aLat: number, aLon: number, bLat: number, bLon: numbe
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
+/** Smallest angle between two headings, 0-180. */
+export function headingGap(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 /**
  * Dead reckoning: advance a position along a constant heading and speed.
  * Good enough for a few tens of seconds between API snapshots.

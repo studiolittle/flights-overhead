@@ -7,35 +7,42 @@ every time you hear one.
 
 ## What it does
 
-- **NOW ARRIVING / NOW DEPARTING / PASSING OVER** banner for the aircraft that
-  matters right now, with the airline, flight number, aircraft type,
+- **NOW ARRIVING / NOW DEPARTING** banner for the aircraft that matters right
+  now, with the airline, flight number, aircraft type,
   registration, a photo of the actual airframe, and the route.
 - **Desktop notifications** when something enters your overhead radius, so you
   can leave the tab in the background.
 - **Passed overhead log** of everything that has flown over, kept in your
   browser.
-- **Route map.** A great-circle line showing the leg already flown from the
-  origin airport and the leg remaining to the destination, with your station
-  marked on it.
-- **Postal code field.** Type `M5V 3L9`, `90210`, `SW1A 1AA` or a place name.
-  Saved locally, so it sticks.
-- **Range presets** of 5 / 10 / 25 / 50 km.
-- **Traffic filter.** Defaults to **YOW ONLY**: just the flights landing at or
-  taking off from Ottawa. **ALL** brings back overflights and everything else
-  in range. The airport is `HOME_AIRPORT` in `lib/config.ts`.
-- **Radar scope** for spatial context: click a blip to pin that flight.
+- **YOW airport panel.** Live wind from the latest METAR, which runway
+  aircraft are landing on and taking off from, and a N/E/S/W scope of the
+  airport with the runways, the approach and climb-out paths, and every
+  arrival and departure as a dot.
+- **Radar scope**, centred on YOW, showing every arrival and departure as a
+  dot. Range presets of 5 / 10 / 25 / 50 km around the airport. Click a blip
+  to pin that flight.
+- **Home field.** Type `M5V 3L9`, `90210`, `SW1A 1AA` or a place name. It does
+  not move the radar — it marks where you are on it, and it is what the
+  "passing overhead" alert is measured from. Saved locally, so it sticks.
+- **YOW traffic only.** Just the flights landing at or taking off from
+  Ottawa; overflights are left out. The airport and its runways are
+  `HOME_AIRPORT` in `lib/config.ts`.
 
 ## How arriving vs departing is decided
 
-Route data is authoritative. If the flight's **destination** airport is within
-70 km of your station it is *arriving*; if the **origin** is, it is *departing*;
-if neither is, it is a *passing overflight*. When no route has been filed the
-app falls back to the vertical profile (low and descending vs low and climbing).
+A flight is *arriving* if its filed destination is CYOW and *departing* if its
+origin is. With no route filed, it counts if it is within 25 km of YOW, below
+~13,000 ft, and descending toward it or climbing away from it. A low aircraft
+climbing or descending near YOW is trusted over its filed route, which can be
+stale. Level aircraft above ~23,000 ft are dropped before any lookups.
 
-In **YOW ONLY** mode the test is narrower: the filed origin or destination must
-be CYOW. With no route filed, an aircraft counts if it is within 25 km of YOW,
-below ~13,000 ft, and descending toward it or climbing away from it. Level
-aircraft above ~23,000 ft are dropped before any lookups.
+## Which runway is in use
+
+An arrival lined up on a runway's extended centreline, or a departure climbing
+straight out along one, marks that runway as in use for 20 minutes. With no
+recent sighting, the answer is the runway pointing most directly into the
+METAR wind (14/32 and 07/25 only; 04/22 is a short GA strip). Under 4 kt the
+wind does not decide, and the panel says so.
 
 ## Stack
 
@@ -46,6 +53,7 @@ credentials off the client and cache aggressively:
 | --- | --- |
 | `/api/flights` | Live positions, plus range/bearing, airframe, route and phase |
 | `/api/geocode` | Postal code / place name to coordinates |
+| `/api/weather` | Latest CYOW METAR (wind, visibility, altimeter), cached 5 min |
 
 ### Data sources
 
@@ -55,6 +63,9 @@ credentials off the client and cache aggressively:
   and flight route. [hexdb](https://hexdb.io/) is the airframe fallback.
 - **[Nominatim](https://nominatim.openstreetmap.org/)** for postal codes, with
   [Zippopotam](https://zippopotam.us/) as a CA/US fallback.
+- **[aviationweather.gov](https://aviationweather.gov/data/api/)** for the
+  CYOW METAR. Runway thresholds come from
+  [OurAirports](https://ourairports.com/).
 
 Lookups are cached in memory (an aircraft's type never changes, a callsign's
 route is stable for months), so steady-state polling costs almost no extra
@@ -76,8 +87,9 @@ npm run dev
 
 On Windows PowerShell, chain with `;` rather than `&&`.
 
-Open http://localhost:3000. It starts on **K2G 6P3 (Nepean, Ontario)**; type a
-different postal code to move the station. No configuration needed to try it.
+Open http://localhost:3000. The radar is centred on YOW; it starts with your
+home at **K2G 6P3 (Nepean, Ontario)**, which you can change to any postal code
+or place name. No configuration needed to try it.
 
 Typography is [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk),
 self-hosted via `next/font`, with tabular figures so the live readouts do not
@@ -89,9 +101,9 @@ All optional, all in `.env.local` (see `.env.example`):
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `HOME_LAT` / `HOME_LON` | K2G 6P3, Nepean ON | Fallback before a postal code is set; see `lib/config.ts`. |
-| `RADAR_RANGE_KM` | `10` | Default range. |
-| `OVERHEAD_RADIUS_KM` | `2.5` | What counts as "overhead". |
+| `HOME_LAT` / `HOME_LON` | K2G 6P3, Nepean ON | Your home before a postal code is set; see `lib/config.ts`. Does not move the radar. |
+| `RADAR_RANGE_KM` | `25` | Default radar range, km around YOW. |
+| `OVERHEAD_RADIUS_KM` | `2.5` | How close to home counts as "overhead". |
 | `NEXT_PUBLIC_POLL_INTERVAL_MS` | `40000` | Refresh interval, min 15000. |
 
 There are no API keys. Every upstream this uses is free and open.
@@ -118,4 +130,10 @@ Notifications need HTTPS, which Vercel provides. Grant permission with the
   taxiing aircraft would otherwise appear to be flying over.
 - The passed-overhead log lives in your browser only, and is capped at 40
   entries.
+- The runway in use is inferred, not read from ATIS. Straight-in sightings are
+  reliable; the wind fallback can pick 14/32 while the tower is using 07/25
+  (or the reverse) when the wind sits between the two.
+- METAR wind is in degrees true, while painted runway numbers are magnetic
+  (about 13° apart in Ottawa). The runway geometry uses true headings, so the
+  comparison is like for like.
 - All motion respects `prefers-reduced-motion`.

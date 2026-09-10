@@ -15,14 +15,12 @@ const PHASE_COLOR: Record<FlightPhase, string> = {
 export function InRangeList({
   contacts,
   selectedId,
-  overheadRadiusKm,
   onSelect,
   title,
   emptyText,
 }: {
   contacts: Contact[];
   selectedId: string | null;
-  overheadRadiusKm: number;
   onSelect: (icao24: string) => void;
   title: string;
   emptyText: string;
@@ -48,11 +46,12 @@ export function InRangeList({
             const cs = decodeCallsign(c.callsign);
             const e = c.enrichment;
             const selected = c.id === selectedId;
-            const overhead = c.distanceKm <= overheadRadiusKm;
+            const overhead = c.overhead === true;
             const operator = cs.operator ?? e?.airlineName;
+            // One end can be blank when an out-of-date filed route was dropped.
             const route =
-              e?.origin?.iata && e?.destination?.iata
-                ? `${e.origin.iata} → ${e.destination.iata}`
+              e?.origin || e?.destination
+                ? `${e?.origin?.iata ?? "?"} → ${e?.destination?.iata ?? "?"}`
                 : null;
 
             return (

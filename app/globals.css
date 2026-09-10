@@ -32,6 +32,7 @@
   --c-on-accent: #192221; /* text on an accent fill */
 
   --c-depart: #b8560f; /* departing state */
+  --c-on-depart: #ffffff; /* text on a depart fill */
   --c-alert: #d33f3f; /* overhead / emergency */
 
   --c-grid: rgb(30 41 38 / 0.14);
@@ -57,6 +58,7 @@
   --c-on-accent: #192221;
 
   --c-depart: #ff9d5c;
+  --c-on-depart: #192221;
   --c-alert: #ff6b6b;
 
   --c-grid: rgb(255 211 81 / 0.11);
@@ -78,6 +80,7 @@
   --color-accent-ink: var(--c-accent-ink);
   --color-on-accent: var(--c-on-accent);
   --color-depart: var(--c-depart);
+  --color-on-depart: var(--c-on-depart);
   --color-alert: var(--c-alert);
   --color-grid: var(--c-grid);
 }
@@ -312,6 +315,8 @@ body::after {
     rgb(var(--c-sweep) / 0.42) 359deg,
     transparent 360deg
   );
+  /* Held back so the aircraft, not the sweep, are the brightest thing. */
+  opacity: 0.55;
   animation: radar-spin 4.5s linear infinite;
 }
 

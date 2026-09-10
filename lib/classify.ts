@@ -1,4 +1,4 @@
-import { bearingDeg, haversineKm } from "./geo";
+import { bearingDeg, haversineKm, headingGap } from "./geo";
 import type {
   AirportRef,
   Contact,
@@ -7,95 +7,18 @@ import type {
   HomeAirport,
 } from "./types";
 
-/**
- * How close an airport has to be to your station to count as "your" airport.
- * Toronto Pearson sits ~25 km from downtown, so 70 km comfortably covers the
- * airports whose traffic actually crosses a given house.
- */
-const LOCAL_AIRPORT_KM = 70;
-
 /** Below this, an aircraft is in the approach/departure regime, not cruising. */
 const TERMINAL_ALT_M = 4000;
 /**
- * Below this (~6,500 ft) an aircraft inside your radar radius is unambiguously
- * working a nearby airport, so the vertical profile is trusted over any filed
- * route.
+ * Below this (~6,500 ft) an aircraft near the airport that is climbing or
+ * descending is unambiguously working it, so the vertical profile is trusted
+ * over any filed route.
  */
 const TERMINAL_CERTAIN_ALT_M = 2000;
 const CRUISE_ALT_M = 7000;
 
 /** Vertical rate that counts as a genuine climb or descent, m/s. */
 const VS_THRESHOLD = 1.0;
-
-function airportDistanceKm(
-  airport: Enrichment["origin"],
-  lat: number,
-  lon: number,
-): number | null {
-  if (!airport || airport.lat == null || airport.lon == null) return null;
-  return haversineKm(lat, lon, airport.lat, airport.lon);
-}
-
-/**
- * Decide whether an aircraft is landing here, taking off from here, or just
- * passing over on its way somewhere else.
- *
- * Route data (when adsbdb has it) is authoritative: if the flight's destination
- * is your local airport it is arriving, full stop. Without route data we fall
- * back to the vertical profile, which is a good proxy near an airport.
- */
-export function classifyPhase(
-  contact: Pick<
-    Contact,
-    "baroAltitudeM" | "verticalRateMs" | "enrichment"
-  >,
-  stationLat: number,
-  stationLon: number,
-): FlightPhase {
-  const { enrichment: e, baroAltitudeM: altM, verticalRateMs: vs } = contact;
-
-  // Physical evidence outranks the filed route. A callsign's route in the
-  // upstream database can be stale or from a different leg, so an aircraft
-  // low and slow inside your radar radius is operating at an airport near
-  // YOU whatever the route claims. Seen in the wild: a regional jet at
-  // 1300 ft descending into Ottawa still filed as EWR to Greer.
-  if (altM != null && altM < TERMINAL_CERTAIN_ALT_M && vs != null) {
-    if (vs <= -VS_THRESHOLD) return "arriving";
-    if (vs >= VS_THRESHOLD) return "departing";
-  }
-
-  const originKm = airportDistanceKm(e?.origin ?? null, stationLat, stationLon);
-  const destKm = airportDistanceKm(
-    e?.destination ?? null,
-    stationLat,
-    stationLon,
-  );
-
-  const destIsLocal = destKm != null && destKm <= LOCAL_AIRPORT_KM;
-  const originIsLocal = originKm != null && originKm <= LOCAL_AIRPORT_KM;
-
-  // Round trips and shuttle hops can have both ends local; the vertical rate
-  // breaks the tie.
-  if (destIsLocal && originIsLocal) {
-    if (vs != null && vs <= -VS_THRESHOLD) return "arriving";
-    if (vs != null && vs >= VS_THRESHOLD) return "departing";
-    return "arriving";
-  }
-  if (destIsLocal) return "arriving";
-  if (originIsLocal) return "departing";
-
-  // Both ends known and neither is local: it is genuinely just passing over.
-  if (originKm != null && destKm != null) return "overflight";
-
-  // No usable route data. Infer from how it is flying.
-  if (altM != null && altM < TERMINAL_ALT_M && vs != null) {
-    if (vs <= -VS_THRESHOLD) return "arriving";
-    if (vs >= VS_THRESHOLD) return "departing";
-  }
-  if (altM != null && altM >= CRUISE_ALT_M) return "overflight";
-
-  return "unknown";
-}
 
 /**
  * Beyond this from the home airport, an aircraft is not assumed to be working
@@ -111,12 +34,6 @@ const HOME_TERMINAL_KM = 25;
  */
 const HOME_NEAR_KM = 12;
 
-/** Smallest angle between two headings, 0-180. */
-function headingGap(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-}
-
 function isAirport(
   ref: AirportRef | null | undefined,
   airport: HomeAirport,
@@ -126,12 +43,15 @@ function isAirport(
 }
 
 /**
- * Is this aircraft landing at or taking off from one particular airport?
- * Null for everything else: overflights, and traffic at other airports nearby.
+ * Is this aircraft landing at or taking off from the home airport? Null for
+ * everything else: overflights, and traffic at other airports nearby.
  *
- * Same evidence order as classifyPhase: a low aircraft climbing or descending
- * near the airport outranks a possibly stale filed route, the route decides
- * everything else, and the vertical profile fills in when nothing is filed.
+ * Physical evidence comes first. A callsign's route in the upstream database
+ * can be stale or from a different leg (seen in the wild: a regional jet at
+ * 1300 ft descending into Ottawa still filed as EWR to Greer), so a low
+ * aircraft climbing or descending near the airport outranks the route. The
+ * route decides everything else, and the vertical profile fills in when
+ * nothing is filed.
  */
 export function classifyHomeAirport(
   contact: Pick<
@@ -184,6 +104,43 @@ export function classifyHomeAirport(
   if (e?.origin && e?.destination) return null;
 
   return fromProfile(TERMINAL_ALT_M);
+}
+
+/**
+ * A flight classified as YOW traffic from how it is flying can still carry a
+ * filed route between two other airports: the upstream database keys routes
+ * by callsign, and airlines reuse flight numbers across legs (seen: RPA3663
+ * climbing out of YOW, filed as EWR to ROC). Showing that route makes a real
+ * YOW departure look like someone else's flight, so the YOW end is restored,
+ * the other end is left blank rather than guessed, and the old route is kept
+ * only as a note.
+ */
+export function reconcileRoute(
+  e: Enrichment | null,
+  phase: "arriving" | "departing",
+  airport: HomeAirport,
+): Enrichment | null {
+  if (!e || (!e.origin && !e.destination)) return e;
+  const homeEnd = phase === "arriving" ? e.destination : e.origin;
+  if (isAirport(homeEnd, airport)) return e;
+
+  const home: AirportRef = {
+    iata: airport.iata,
+    icao: airport.icao,
+    name: airport.name,
+    municipality: airport.name,
+    countryName: null,
+    lat: airport.lat,
+    lon: airport.lon,
+  };
+  const code = (a: AirportRef | null) => a?.iata ?? a?.icao ?? "?";
+
+  return {
+    ...e,
+    origin: phase === "departing" ? home : null,
+    destination: phase === "arriving" ? home : null,
+    staleRoute: `${code(e.origin)} → ${code(e.destination)}`,
+  };
 }
 
 /** Level at cruise: not landing at or taking off from anywhere nearby. */

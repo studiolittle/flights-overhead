@@ -11,9 +11,8 @@ import {
 import { PHASE_LABEL } from "@/lib/classify";
 import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
 import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
-import type { Contact, FlightPhase, TrackResponse } from "@/lib/types";
+import type { Contact, FlightPhase } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
-import { FlightMap } from "./FlightMap";
 
 const PHASE_COLOR: Record<FlightPhase, string> = {
   arriving: "var(--color-accent-ink)",
@@ -22,8 +21,18 @@ const PHASE_COLOR: Record<FlightPhase, string> = {
   unknown: "var(--color-ink-dim)",
 };
 
-function PhaseIcon({ phase, color }: { phase: FlightPhase; color: string }) {
-  const props = { size: 22, weight: "bold" as const, style: { color } };
+/**
+ * Arrivals and departures are the board's headline event, so they get a solid
+ * banner, and the whole card takes on a tint of the same colour.
+ */
+const PHASE_BANNER: Partial<Record<FlightPhase, { bg: string; fg: string }>> = {
+  arriving: { bg: "var(--color-accent)", fg: "var(--color-on-accent)" },
+  departing: { bg: "var(--color-depart)", fg: "var(--color-on-depart)" },
+};
+
+/** Takes its colour from the surrounding text. */
+function PhaseIcon({ phase, size }: { phase: FlightPhase; size: number }) {
+  const props = { size, weight: "bold" as const };
   if (phase === "arriving") return <AirplaneLanding {...props} />;
   if (phase === "departing") return <AirplaneTakeoff {...props} />;
   return <AirplaneInFlight {...props} />;
@@ -73,9 +82,6 @@ export function FlightBoard({
   overhead,
   pinned,
   onClear,
-  station,
-  track,
-  trackLoading,
   emptyTitle,
   emptyText,
 }: {
@@ -83,9 +89,6 @@ export function FlightBoard({
   overhead: boolean;
   pinned: boolean;
   onClear: () => void;
-  station: { lat: number; lon: number };
-  track: TrackResponse | null;
-  trackLoading: boolean;
   emptyTitle: string;
   emptyText: string;
 }) {
@@ -130,25 +133,55 @@ export function FlightBoard({
     .filter(Boolean)
     .join(" · ");
 
+  const banner = PHASE_BANNER[contact.phase];
+
   return (
-    <div className="panel flex flex-col">
-      {/* Phase header */}
+    <div
+      className="panel flex flex-col"
+      style={
+        banner
+          ? {
+              borderColor: banner.bg,
+              background: `color-mix(in srgb, ${banner.bg} 7%, var(--color-surface))`,
+            }
+          : undefined
+      }
+    >
+      {/* Phase header: a solid banner for arrivals and departures, a
+          coloured rule for anything else. */}
       <div
-        className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-5 py-3"
-        style={{ borderLeft: `4px solid ${color}` }}
+        className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 ${
+          banner ? "py-4" : "border-b border-line py-3"
+        }`}
+        style={
+          banner
+            ? { background: banner.bg, color: banner.fg }
+            : { borderLeft: `4px solid ${color}`, color }
+        }
       >
         <span className={overhead ? "pulse-soft" : undefined}>
-          <PhaseIcon phase={contact.phase} color={color} />
+          <PhaseIcon phase={contact.phase} size={banner ? 30 : 22} />
         </span>
         <span
-          className="whitespace-nowrap text-[15px] tracking-[0.28em]"
-          style={{ color }}
+          className={`whitespace-nowrap leading-none ${
+            banner
+              ? "text-[22px] font-semibold tracking-[0.2em] md:text-[26px]"
+              : "text-[15px] tracking-[0.28em]"
+          }`}
         >
           {PHASE_LABEL[contact.phase]}
         </span>
 
         {overhead && (
-          <span className="whitespace-nowrap border border-alert px-2 py-0.5 text-[11.5px] tracking-[0.2em] text-alert">
+          <span
+            className={`whitespace-nowrap px-2 py-0.5 text-[11.5px] tracking-[0.2em] ${
+              banner ? "font-semibold" : "border border-alert text-alert"
+            }`}
+            // Inverted on the banner: red on gold is too low-contrast.
+            style={
+              banner ? { background: banner.fg, color: banner.bg } : undefined
+            }
+          >
             OVERHEAD NOW
           </span>
         )}
@@ -159,7 +192,11 @@ export function FlightBoard({
         )}
 
         <span className="ml-auto flex items-center gap-3">
-          <span className="text-[11.5px] tracking-[0.2em] text-ink-faint">
+          <span
+            className={`text-[11.5px] tracking-[0.2em] ${
+              banner ? "opacity-70" : "text-ink-faint"
+            }`}
+          >
             {pinned ? "PINNED" : "AUTO"}
           </span>
           {pinned && (
@@ -167,6 +204,11 @@ export function FlightBoard({
               type="button"
               onClick={onClear}
               className="chip flex items-center gap-1.5"
+              style={
+                banner
+                  ? { borderColor: banner.fg, color: banner.fg }
+                  : undefined
+              }
             >
               <X size={11} weight="bold" />
               CLEAR
@@ -201,20 +243,28 @@ export function FlightBoard({
 
         {/* Route */}
         {e?.origin || e?.destination ? (
-          <div className="flex items-center gap-4 border-y border-line py-4">
-            <Endpoint
-              code={e?.origin?.iata ?? e?.origin?.icao}
-              city={e?.origin?.municipality ?? e?.origin?.name}
-            />
-            <ArrowRight
-              size={20}
-              weight="bold"
-              className="shrink-0 text-ink-faint"
-            />
-            <Endpoint
-              code={e?.destination?.iata ?? e?.destination?.icao}
-              city={e?.destination?.municipality ?? e?.destination?.name}
-            />
+          <div className="border-y border-line py-4">
+            <div className="flex items-center gap-4">
+              <Endpoint
+                code={e?.origin?.iata ?? e?.origin?.icao}
+                city={e?.origin?.municipality ?? e?.origin?.name}
+              />
+              <ArrowRight
+                size={20}
+                weight="bold"
+                className="shrink-0 text-ink-faint"
+              />
+              <Endpoint
+                code={e?.destination?.iata ?? e?.destination?.icao}
+                city={e?.destination?.municipality ?? e?.destination?.name}
+              />
+            </div>
+            {e?.staleRoute && (
+              <p className="mt-2.5 text-[12.5px] leading-snug text-ink-faint">
+                The route on file for this flight number ({e.staleRoute}) is
+                out of date, so only the Ottawa end is shown.
+              </p>
+            )}
           </div>
         ) : (
           <p className="border-y border-line py-4 text-[13.5px] text-ink-faint">
@@ -245,23 +295,6 @@ export function FlightBoard({
             value={`${contact.distanceKm.toFixed(1)} km ${compass16(contact.bearingDeg)}`}
             tone={overhead ? "var(--color-alert)" : undefined}
           />
-        </div>
-
-        {/* Where it has flown, over real geography */}
-        <div className="border-t border-line pt-4">
-          <p className="text-[11.5px] tracking-[0.18em] text-ink-faint">
-            FLIGHT PATH
-          </p>
-          <div className="mt-2.5">
-            <FlightMap
-              track={track}
-              loading={trackLoading}
-              current={{ lat: contact.lat, lon: contact.lon }}
-              origin={e?.origin ?? null}
-              destination={e?.destination ?? null}
-              station={station}
-            />
-          </div>
         </div>
 
         {/* Fun facts about this aircraft type */}
