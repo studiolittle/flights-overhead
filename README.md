@@ -57,10 +57,13 @@ requests.
 ## Local setup
 
 ```bash
+git clone https://github.com/studiolittle/flights-overhead.git
 cd flights-overhead
 npm install
 npm run dev
 ```
+
+On Windows PowerShell, chain with `;` rather than `&&`.
 
 Open http://localhost:3000. It starts on **K2G 6P3 (Nepean, Ontario)**; type a
 different postal code to move the station. No configuration needed to try it.
@@ -95,11 +98,14 @@ Basic auth with username and password is no longer supported by OpenSky.
 
 ## Deploy to Vercel
 
-1. Push to a Git repo, or run `vercel` from inside `flights-overhead/`.
-2. Set the **Root Directory** to `flights-overhead` if the repo contains other
-   projects.
-3. Add the environment variables above.
-4. Deploy.
+Import <https://github.com/studiolittle/flights-overhead> at
+[vercel.com/new](https://vercel.com/new). Next.js is detected automatically and
+the defaults are correct, including **Root Directory** `./` (this repo is the
+project root). Add the environment variables above under
+**Settings → Environment Variables** if you want OpenSky credentials, then
+deploy. Every push to `main` redeploys.
+
+Notifications need HTTPS, which Vercel provides.
 
 Notifications need HTTPS, which Vercel provides. Grant permission with the
 **ALERTS** toggle; browsers only allow that request from a real click.
