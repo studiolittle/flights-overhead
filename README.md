@@ -10,8 +10,6 @@ every time you hear one.
 - **NOW ARRIVING / NOW DEPARTING** banner for the aircraft that matters right
   now, with the airline, flight number, aircraft type,
   registration, a photo of the actual airframe, and the route.
-- **Desktop notifications** when something enters your overhead radius, so you
-  can leave the tab in the background.
 - **Passed overhead log** of everything that has flown over, kept in your
   browser.
 - **YOW airport panel.** Live wind from the latest METAR, which runway
@@ -115,9 +113,6 @@ Import <https://github.com/studiolittle/flights-overhead> at
 the defaults are correct, including **Root Directory** `./` (this repo is the
 project root). No environment variables are required. Every push to `main`
 redeploys.
-
-Notifications need HTTPS, which Vercel provides. Grant permission with the
-**ALERTS** toggle; browsers only allow that request from a real click.
 
 ## Known limits
 

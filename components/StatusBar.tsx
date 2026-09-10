@@ -27,10 +27,10 @@ export function StatusBar({
   const age = snapshotAt ? ageLabel(nowTs - snapshotAt) : "--";
 
   return (
-    <div className="panel flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 text-[12.5px] tracking-[0.12em] text-ink-dim">
-      <span className="flex items-center gap-2 text-accent-ink">
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11.5px] tracking-[0.12em] text-ink-faint">
+      <span className="flex items-center gap-1.5 text-ink-dim">
         <Broadcast
-          size={14}
+          size={12}
           weight="bold"
           className={stale ? "opacity-40" : "live-dot"}
         />

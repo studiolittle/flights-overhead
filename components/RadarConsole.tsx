@@ -3,15 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Broadcast } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
-import { decodeCallsign } from "@/lib/aircraft";
-import { PHASE_LABEL } from "@/lib/classify";
 import { HOME_AIRPORT } from "@/lib/config";
-import {
-  fireNotification,
-  notifyState,
-  requestNotifyPermission,
-  type NotifyState,
-} from "@/lib/notify";
 import type { ApiResponse, Contact, Station } from "@/lib/types";
 import { AirportPanel } from "./AirportPanel";
 import { StationControls } from "./StationControls";
@@ -36,9 +28,6 @@ const POLL_MS = Math.max(
  * stay above POLL_MS or blips visibly freeze at the end of every cycle.
  */
 const MAX_DR_SECONDS = 45;
-
-/** Do not re-alert for the same aircraft within this window. */
-const RENOTIFY_MS = 30 * 60 * 1000;
 
 const KEY_STATION = "fo.station";
 const KEY_RANGE = "fo.range";
@@ -69,14 +58,11 @@ export function RadarConsole() {
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [notify, setNotify] = useState<NotifyState>("default");
 
   const [resolving, setResolving] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const pollAbort = useRef<AbortController | null>(null);
-  /** icao24 -> last alert time, so one pass does not alert repeatedly. */
-  const alerted = useRef<Map<string, number>>(new Map());
 
   // --- boot: restore preferences -------------------------------------------
   useEffect(() => {
@@ -86,7 +72,6 @@ export function RadarConsole() {
     if (storedStation) setStation(storedStation);
     if (typeof storedRange === "number") setRangeKm(storedRange);
 
-    setNotify(notifyState());
     setNowTs(Date.now());
     setMounted(true);
   }, []);
@@ -246,45 +231,6 @@ export function RadarConsole() {
     : autoFocus;
   const boardOverhead = boardContact?.overhead ?? false;
 
-  // --- overhead alerts ----------------------------------------------------
-  useEffect(() => {
-    if (!data) return;
-    const now = Date.now();
-
-    for (const c of data.contacts) {
-      if (c.distanceKm > data.overheadRadiusKm) continue;
-      const last = alerted.current.get(c.id);
-      if (last && now - last < RENOTIFY_MS) continue;
-      alerted.current.set(c.id, now);
-
-      const cs = decodeCallsign(c.callsign);
-      const e = c.enrichment;
-      const operator = cs.operator ?? e?.airlineName ?? e?.owner ?? null;
-      const type =
-        e?.manufacturer && e?.type
-          ? `${e.manufacturer} ${e.type}`
-          : (e?.type ?? e?.icaoType ?? null);
-      const routeWords =
-        e?.origin?.municipality && e?.destination?.municipality
-          ? `${e.origin.municipality} → ${e.destination.municipality}`
-          : e?.origin?.iata && e?.destination?.iata
-            ? `${e.origin.iata} → ${e.destination.iata}`
-            : null;
-
-      const title = PHASE_LABEL[c.phase];
-      const body = [
-        operator && cs.flightNumber
-          ? `${operator} ${cs.flightNumber}`
-          : c.callsign,
-        type,
-        routeWords,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      fireNotification(title, body, `fo-${c.id}`);
-    }
-  }, [data]);
-
   // --- actions --------------------------------------------------------------
   const applyStation = useCallback(async (query: string) => {
     setResolving(true);
@@ -307,7 +253,6 @@ export function RadarConsole() {
       setStation(next);
       writeStore(KEY_STATION, next);
       setSelectedId(null);
-      alerted.current.clear();
     } catch {
       setGeoError("Location lookup failed.");
     } finally {
@@ -322,14 +267,6 @@ export function RadarConsole() {
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedId((cur) => (cur === id ? null : id));
-  }, []);
-
-  const toggleNotify = useCallback(async () => {
-    if (notifyState() === "granted") {
-      setNotify("granted");
-      return;
-    }
-    setNotify(await requestNotifyPermission());
   }, []);
 
   const loading = !data && !fetchError;
@@ -374,20 +311,6 @@ export function RadarConsole() {
             onSetRange={applyRange}
             resolving={resolving}
             error={geoError}
-            notify={notify}
-            onToggleNotify={toggleNotify}
-          />
-
-          <StatusBar
-            source={data?.source ?? "adsb.lol"}
-            snapshotAt={data?.updatedAt ?? null}
-            count={live.length}
-            rangeKm={effectiveRange}
-            home={home}
-            pollMs={POLL_MS}
-            stale={Boolean(data?.stale) || Boolean(fetchError)}
-            error={fetchError ?? data?.error ?? null}
-            nowTs={nowTs || Date.now()}
           />
 
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
@@ -440,6 +363,21 @@ export function RadarConsole() {
       )}
 
       <footer className="mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
+        {mounted && (
+          <div className="mb-2">
+            <StatusBar
+              source={data?.source ?? "adsb.lol"}
+              snapshotAt={data?.updatedAt ?? null}
+              count={live.length}
+              rangeKm={effectiveRange}
+              home={home}
+              pollMs={POLL_MS}
+              stale={Boolean(data?.stale) || Boolean(fetchError)}
+              error={fetchError ?? data?.error ?? null}
+              nowTs={nowTs || Date.now()}
+            />
+          </div>
+        )}
         <span>For fun. Enjoy :)</span>
         <a
           href="mailto:info@studiolittle.ca"

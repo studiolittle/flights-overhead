@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { BellRinging, BellSlash, MapPin } from "@phosphor-icons/react/dist/ssr";
-import type { NotifyState } from "@/lib/notify";
+import { MapPin } from "@phosphor-icons/react/dist/ssr";
 
 const RANGE_PRESETS = [5, 10, 25, 50] as const;
 
@@ -14,8 +13,6 @@ export function StationControls({
   onSetRange,
   resolving,
   error,
-  notify,
-  onToggleNotify,
 }: {
   query: string;
   stationLabel: string | null;
@@ -24,8 +21,6 @@ export function StationControls({
   onSetRange: (km: number) => void;
   resolving: boolean;
   error: string | null;
-  notify: NotifyState;
-  onToggleNotify: () => void;
 }) {
   const [value, setValue] = useState(query);
 
@@ -34,9 +29,6 @@ export function StationControls({
     const trimmed = value.trim();
     if (trimmed) onSetStation(trimmed);
   }
-
-  const notifyOn = notify === "granted";
-  const notifyDisabled = notify === "unsupported" || notify === "denied";
 
   return (
     <div className="panel flex flex-col gap-4 px-4 py-3.5 lg:flex-row lg:items-start lg:gap-8">
@@ -93,38 +85,6 @@ export function StationControls({
         <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
           How far around the airport the radar reaches. 25 km covers the whole
           approach.
-        </p>
-      </div>
-
-      {/* Alerts */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">ALERTS</span>
-        <button
-          type="button"
-          onClick={onToggleNotify}
-          disabled={notifyDisabled}
-          aria-pressed={notifyOn}
-          className={`chip flex items-center gap-2 ${notifyOn ? "chip-on" : ""}`}
-        >
-          {notifyOn ? (
-            <BellRinging size={13} weight="bold" />
-          ) : (
-            <BellSlash size={13} weight="bold" />
-          )}
-          {notify === "unsupported"
-            ? "UNSUPPORTED"
-            : notify === "denied"
-              ? "BLOCKED"
-              : notifyOn
-                ? "ON"
-                : "OFF"}
-        </button>
-        <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
-          {notify === "denied"
-            ? "Notifications are blocked in your browser settings."
-            : notify === "unsupported"
-              ? "This browser cannot show notifications."
-              : "A desktop notification when a plane passes overhead."}
         </p>
       </div>
 
