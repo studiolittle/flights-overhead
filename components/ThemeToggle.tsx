@@ -42,16 +42,17 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-label={`Switch to ${goingTo} mode`}
       title={`Switch to ${goingTo} mode`}
-      className="chip flex h-8 w-8 items-center justify-center p-0"
+      /* grid, not flex: a flex child SVG takes its main-axis size from the
+         width attribute, ignoring the CSS size. grid places it cleanly. */
+      className="chip grid h-10 w-10 place-items-center p-0"
     >
-      {/* Render nothing distinguishing until mounted to avoid a hydration
-          mismatch on the icon. */}
+      {/* Render a neutral box until mounted to avoid a hydration mismatch. */}
       {mounted && theme === "dark" ? (
-        <Sun size={15} weight="bold" />
+        <Sun size={22} weight="bold" />
       ) : mounted ? (
-        <Moon size={15} weight="bold" />
+        <Moon size={22} weight="bold" />
       ) : (
-        <span className="block h-[15px] w-[15px]" />
+        <span className="block h-[22px] w-[22px]" />
       )}
     </button>
   );

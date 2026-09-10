@@ -39,7 +39,7 @@ export function StationControls({
   const notifyDisabled = notify === "unsupported" || notify === "denied";
 
   return (
-    <div className="panel flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-end lg:gap-8">
+    <div className="panel flex flex-col gap-4 px-4 py-3.5 lg:flex-row lg:items-start lg:gap-8">
       {/* Location */}
       <form onSubmit={submit} className="flex flex-col gap-1.5">
         <label
@@ -54,16 +54,22 @@ export function StationControls({
             name="station"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="M5V 3L9"
+            placeholder="K2G 6P3"
             autoComplete="postal-code"
             spellCheck={false}
-            aria-describedby="station-help"
+            aria-describedby="station-hint"
             className="field w-[9.5rem] uppercase"
           />
           <button type="submit" className="btn" disabled={resolving}>
             {resolving ? "..." : "SET"}
           </button>
         </div>
+        <p
+          id="station-hint"
+          className="max-w-[15rem] text-[12px] leading-snug text-ink-faint"
+        >
+          Your postal code, ZIP or city. This is the centre of the radar.
+        </p>
       </form>
 
       {/* Range */}
@@ -83,6 +89,9 @@ export function StationControls({
           ))}
           <span className="ml-1 text-[12.5px] text-ink-faint">KM</span>
         </div>
+        <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
+          How wide a circle to watch. Try 25 or 50 if your sky is quiet.
+        </p>
       </div>
 
       {/* Alerts */}
@@ -108,13 +117,17 @@ export function StationControls({
                 ? "ON"
                 : "OFF"}
         </button>
+        <p className="max-w-[15rem] text-[12px] leading-snug text-ink-faint">
+          {notify === "denied"
+            ? "Notifications are blocked in your browser settings."
+            : notify === "unsupported"
+              ? "This browser cannot show notifications."
+              : "A desktop notification when a plane passes overhead."}
+        </p>
       </div>
 
       {/* Resolved location / error */}
-      <p
-        id="station-help"
-        className="flex min-h-[18px] items-center gap-1.5 text-[12.5px] lg:ml-auto lg:pb-1"
-      >
+      <p className="flex min-h-[18px] items-center gap-1.5 text-[12.5px] lg:ml-auto lg:pt-6">
         {error ? (
           <span className="text-depart">{error}</span>
         ) : stationLabel ? (
@@ -122,9 +135,7 @@ export function StationControls({
             <MapPin size={13} weight="bold" className="text-accent-ink" />
             <span className="text-ink-dim">{stationLabel}</span>
           </>
-        ) : (
-          <span className="text-ink-faint">Postal code, ZIP or place name</span>
-        )}
+        ) : null}
       </p>
     </div>
   );

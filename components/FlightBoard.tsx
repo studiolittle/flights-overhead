@@ -12,7 +12,7 @@ import { PHASE_LABEL } from "@/lib/classify";
 import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
 import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
 import type { Contact, FlightPhase } from "@/lib/types";
-import { FlightPathMap } from "./FlightPathMap";
+import { AircraftFacts } from "./AircraftFacts";
 
 const PHASE_COLOR: Record<FlightPhase, string> = {
   arriving: "var(--color-accent-ink)",
@@ -72,13 +72,11 @@ export function FlightBoard({
   overhead,
   pinned,
   onClear,
-  station,
 }: {
   contact: Contact | null;
   overhead: boolean;
   pinned: boolean;
   onClear: () => void;
-  station: { lat: number; lon: number };
 }) {
   if (!contact) {
     return (
@@ -171,7 +169,7 @@ export function FlightBoard({
         {/* Identity */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="truncate text-[30px] leading-tight text-ink md:text-[40px]">
+            <h2 className="text-[26px] leading-[1.12] text-pretty break-words text-ink md:text-[34px]">
               {title}
             </h2>
             <p className="mt-1.5 text-[13.5px] text-ink-dim">
@@ -239,17 +237,8 @@ export function FlightBoard({
           />
         </div>
 
-        {/* Route map: where it has come from and where it is going */}
-        {(e?.origin || e?.destination) && (
-          <div className="border-t border-line pt-4">
-            <FlightPathMap
-              origin={e?.origin ?? null}
-              destination={e?.destination ?? null}
-              current={{ lat: contact.lat, lon: contact.lon }}
-              station={station}
-            />
-          </div>
-        )}
+        {/* Fun facts about this aircraft type */}
+        <AircraftFacts icaoType={e?.icaoType} />
       </div>
     </div>
   );

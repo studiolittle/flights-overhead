@@ -339,7 +339,6 @@ export function RadarConsole() {
                 overhead={boardOverhead}
                 pinned={pinned}
                 onClear={() => setSelectedId(null)}
-                station={home}
               />
             </div>
 
