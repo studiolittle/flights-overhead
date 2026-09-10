@@ -5,13 +5,20 @@ import { Broadcast } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { decodeCallsign } from "@/lib/aircraft";
 import { PHASE_LABEL } from "@/lib/classify";
+import { HOME_AIRPORT } from "@/lib/config";
 import {
   fireNotification,
   notifyState,
   requestNotifyPermission,
   type NotifyState,
 } from "@/lib/notify";
-import type { ApiResponse, Contact, Station } from "@/lib/types";
+import type {
+  ApiResponse,
+  Contact,
+  Station,
+  TrackResponse,
+  TrafficFilter,
+} from "@/lib/types";
 import { StationControls } from "./StationControls";
 import { FlightBoard } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
@@ -40,6 +47,7 @@ const RENOTIFY_MS = 30 * 60 * 1000;
 
 const KEY_STATION = "fo.station";
 const KEY_RANGE = "fo.range";
+const KEY_FILTER = "fo.filter";
 
 function readStore<T>(key: string): T | null {
   try {
@@ -62,17 +70,21 @@ export function RadarConsole() {
   const [mounted, setMounted] = useState(false);
   const [station, setStation] = useState<Station | null>(null);
   const [rangeKm, setRangeKm] = useState(10);
+  const [filter, setFilter] = useState<TrafficFilter>("airport");
   const [data, setData] = useState<ApiResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notify, setNotify] = useState<NotifyState>("default");
+  const [track, setTrack] = useState<TrackResponse | null>(null);
+  const [trackLoading, setTrackLoading] = useState(false);
 
   const [resolving, setResolving] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
   const pollAbort = useRef<AbortController | null>(null);
+  const trackAbort = useRef<AbortController | null>(null);
   /** icao24 -> last alert time, so one pass does not alert repeatedly. */
   const alerted = useRef<Map<string, number>>(new Map());
 
@@ -80,9 +92,13 @@ export function RadarConsole() {
   useEffect(() => {
     const storedStation = readStore<Station>(KEY_STATION);
     const storedRange = readStore<number>(KEY_RANGE);
+    const storedFilter = readStore<TrafficFilter>(KEY_FILTER);
 
     if (storedStation) setStation(storedStation);
     if (typeof storedRange === "number") setRangeKm(storedRange);
+    if (storedFilter === "airport" || storedFilter === "all") {
+      setFilter(storedFilter);
+    }
 
     setNotify(notifyState());
     setNowTs(Date.now());
@@ -95,7 +111,7 @@ export function RadarConsole() {
     const ac = new AbortController();
     pollAbort.current = ac;
 
-    const params = new URLSearchParams({ range: String(rangeKm) });
+    const params = new URLSearchParams({ range: String(rangeKm), filter });
     if (station) {
       params.set("lat", String(station.lat));
       params.set("lon", String(station.lon));
@@ -124,7 +140,7 @@ export function RadarConsole() {
       if ((err as Error).name === "AbortError") return;
       setFetchError((err as Error).message || "Network error");
     }
-  }, [rangeKm, station]);
+  }, [rangeKm, station, filter]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -230,6 +246,49 @@ export function RadarConsole() {
     }
   }, [data]);
 
+  // --- recorded track for whatever is on the board -------------------------
+  const boardIcao = boardContact?.icao24 ?? null;
+
+  useEffect(() => {
+    if (!boardIcao) {
+      setTrack(null);
+      setTrackLoading(false);
+      return;
+    }
+
+    trackAbort.current?.abort();
+    const ac = new AbortController();
+    trackAbort.current = ac;
+    setTrackLoading(true);
+
+    // Let the board settle before pulling a trace: in auto mode the focused
+    // aircraft can change between polls, and each trace is a real download
+    // from a volunteer-run feed.
+    const timer = setTimeout(() => {
+      fetch(`/api/track?icao24=${boardIcao}`, {
+        signal: ac.signal,
+        cache: "no-store",
+      })
+        .then((r) =>
+          r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+        )
+        .then((json: TrackResponse) => {
+          setTrack(json);
+          setTrackLoading(false);
+        })
+        .catch((err) => {
+          if ((err as Error).name === "AbortError") return;
+          setTrack(null);
+          setTrackLoading(false);
+        });
+    }, 1200);
+
+    return () => {
+      clearTimeout(timer);
+      ac.abort();
+    };
+  }, [boardIcao]);
+
   // --- actions --------------------------------------------------------------
   const applyStation = useCallback(async (query: string) => {
     setResolving(true);
@@ -265,6 +324,13 @@ export function RadarConsole() {
     writeStore(KEY_RANGE, km);
   }, []);
 
+  const applyFilter = useCallback((next: TrafficFilter) => {
+    setFilter(next);
+    writeStore(KEY_FILTER, next);
+    // A pinned flight may not exist under the new filter.
+    setSelectedId(null);
+  }, []);
+
   const toggleNotify = useCallback(async () => {
     if (notifyState() === "granted") {
       setNotify("granted");
@@ -274,6 +340,8 @@ export function RadarConsole() {
   }, []);
 
   const loading = !data && !fetchError;
+  const airportOnly = filter === "airport";
+  const code = HOME_AIRPORT.iata;
 
   return (
     <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
@@ -312,6 +380,9 @@ export function RadarConsole() {
             rangeKm={rangeKm}
             onSetStation={applyStation}
             onSetRange={applyRange}
+            filter={filter}
+            airportCode={code}
+            onSetFilter={applyFilter}
             resolving={resolving}
             error={geoError}
             notify={notify}
@@ -339,6 +410,17 @@ export function RadarConsole() {
                 overhead={boardOverhead}
                 pinned={pinned}
                 onClear={() => setSelectedId(null)}
+                station={home}
+                track={track}
+                trackLoading={trackLoading}
+                emptyTitle={
+                  airportOnly ? `NO ${code} TRAFFIC IN RANGE` : "NOTHING IN RANGE"
+                }
+                emptyText={
+                  airportOnly
+                    ? `Flights landing at or taking off from ${HOME_AIRPORT.name} (${code}) appear here with their type and route. Try 25 km to cover the whole approach.`
+                    : "When an aircraft comes within range it appears here with its type and route. Widen the range if your area is quiet."
+                }
               />
             </div>
 
@@ -365,6 +447,12 @@ export function RadarConsole() {
                 overheadRadiusKm={overheadRadius}
                 onSelect={(id) =>
                   setSelectedId((cur) => (cur === id ? null : id))
+                }
+                title={airportOnly ? `${code} TRAFFIC` : "IN RANGE"}
+                emptyText={
+                  airportOnly
+                    ? `No ${code} arrivals or departures in range.`
+                    : "Nothing overhead right now."
                 }
               />
             </div>

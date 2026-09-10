@@ -1,4 +1,17 @@
-import type { Station } from "./types";
+import type { HomeAirport, Station } from "./types";
+
+/**
+ * The airport whose arrivals and departures the board shows by default.
+ * Ottawa Macdonald-Cartier sits ~8 km east of the default station, so runway
+ * 07/25 traffic crosses it on approach and climb-out.
+ */
+export const HOME_AIRPORT: HomeAirport = {
+  iata: "YOW",
+  icao: "CYOW",
+  name: "Ottawa",
+  lat: 45.3225,
+  lon: -75.6692,
+};
 
 /**
  * Where the radar points before anyone types a postal code.

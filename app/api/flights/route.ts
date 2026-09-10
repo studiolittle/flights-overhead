@@ -2,9 +2,14 @@ import { NextResponse } from "next/server";
 import { fetchNearby, type AdsbAircraft } from "@/lib/adsblol";
 import { haversineKm, bearingDeg } from "@/lib/geo";
 import { enrichMany } from "@/lib/enrich";
-import { classifyPhase } from "@/lib/classify";
-import { DEFAULT_STATION } from "@/lib/config";
-import type { ApiResponse, Contact, Enrichment } from "@/lib/types";
+import { classifyHomeAirport, classifyPhase, isCruising } from "@/lib/classify";
+import { DEFAULT_STATION, HOME_AIRPORT } from "@/lib/config";
+import type {
+  ApiResponse,
+  Contact,
+  Enrichment,
+  TrafficFilter,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -128,8 +133,11 @@ export async function GET(request: Request) {
     Math.min(OVERHEAD_KM * 4, rangeKm * 0.2),
   );
   const isBuiltInDefault = !hasStationParam && !HAS_ENV_HOME;
+  // Home-airport traffic unless the client explicitly asks for everything.
+  const filter: TrafficFilter =
+    params.get("filter") === "all" ? "all" : "airport";
 
-  const cacheKey = `${lat.toFixed(3)}:${lon.toFixed(3)}:${rangeKm}`;
+  const cacheKey = `${lat.toFixed(3)}:${lon.toFixed(3)}:${rangeKm}:${filter}`;
   const cached = payloadCache.get(cacheKey);
   if (cached && now - cached.at < CACHE_TTL_MS) {
     return NextResponse.json(cached.data);
@@ -172,24 +180,31 @@ export async function GET(request: Request) {
       .filter((x) => x.contact.distanceKm <= rangeKm * QUERY_BUFFER)
       .sort((a, b) => a.contact.distanceKm - b.contact.distanceKm);
 
+    // Level cruisers can never be home-airport traffic, so drop them before
+    // they use up the enrichment budget meant for the flights we will show.
+    const candidates =
+      filter === "airport"
+        ? inRange.filter((x) => !isCruising(x.contact))
+        : inRange;
+
     const lookups = await enrichMany(
-      inRange.map((x) => ({
+      candidates.map((x) => ({
         icao24: x.contact.icao24,
         callsign: x.contact.callsign,
       })),
       ENRICH_LIMIT,
     );
 
-    const contacts = inRange.map(({ feed, contact }) => {
-      const enrichment = mergeEnrichment(
-        feed,
-        lookups.get(contact.icao24) ?? null,
-      );
-      return {
+    const contacts = candidates.flatMap(({ feed, contact }): Contact[] => {
+      const enriched = {
         ...contact,
-        enrichment,
-        phase: classifyPhase({ ...contact, enrichment }, lat, lon),
+        enrichment: mergeEnrichment(feed, lookups.get(contact.icao24) ?? null),
       };
+      if (filter === "all") {
+        return [{ ...enriched, phase: classifyPhase(enriched, lat, lon) }];
+      }
+      const phase = classifyHomeAirport(enriched, HOME_AIRPORT);
+      return phase ? [{ ...enriched, phase }] : [];
     });
 
     const data: ApiResponse = {

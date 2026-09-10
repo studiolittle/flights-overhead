@@ -17,17 +17,21 @@ export function InRangeList({
   selectedId,
   overheadRadiusKm,
   onSelect,
+  title,
+  emptyText,
 }: {
   contacts: Contact[];
   selectedId: string | null;
   overheadRadiusKm: number;
   onSelect: (icao24: string) => void;
+  title: string;
+  emptyText: string;
 }) {
   return (
     <div className="panel flex flex-col">
       <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
         <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">
-          IN RANGE
+          {title}
         </span>
         <span className="text-[11.5px] tracking-[0.18em] text-ink-faint">
           {contacts.length === 0 ? "NONE" : `${contacts.length} AIRCRAFT`}
@@ -36,7 +40,7 @@ export function InRangeList({
 
       {contacts.length === 0 ? (
         <p className="px-4 py-6 text-[13.5px] text-ink-dim">
-          Nothing overhead right now.
+          {emptyText}
         </p>
       ) : (
         <ul className="divide-y divide-line">

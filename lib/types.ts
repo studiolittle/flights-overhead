@@ -1,6 +1,21 @@
 /** What this aircraft is doing relative to your station. */
 export type FlightPhase = "arriving" | "departing" | "overflight" | "unknown";
 
+/**
+ * `airport`: only flights landing at or taking off from the home airport.
+ * `all`: everything in range, overflights included.
+ */
+export type TrafficFilter = "airport" | "all";
+
+export interface HomeAirport {
+  iata: string;
+  icao: string;
+  /** Short place name for copy, e.g. "Ottawa". */
+  name: string;
+  lat: number;
+  lon: number;
+}
+
 export interface AirportRef {
   iata: string | null;
   icao: string | null;
@@ -70,6 +85,29 @@ export interface ApiResponse {
   contacts: Contact[];
   count: number;
   stale: boolean;
+  error: string | null;
+}
+
+/** One recorded position from an aircraft's trace. */
+export interface TrackPoint {
+  /** Unix seconds. */
+  t: number;
+  lat: number;
+  lon: number;
+  /** Barometric altitude in feet; 0 while on the ground, null if unknown. */
+  altFt: number | null;
+}
+
+export interface TrackResponse {
+  icao24: string;
+  registration: string | null;
+  type: string | null;
+  /** The current leg, downsampled. Empty when no trace is available. */
+  points: TrackPoint[];
+  /** Unix seconds of the first point of the leg. */
+  startedAt: number | null;
+  /** True when the leg starts from a ground fix, i.e. a real departure. */
+  fromGround: boolean;
   error: string | null;
 }
 

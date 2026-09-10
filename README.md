@@ -20,6 +20,9 @@ every time you hear one.
 - **Postal code field.** Type `M5V 3L9`, `90210`, `SW1A 1AA` or a place name.
   Saved locally, so it sticks.
 - **Range presets** of 5 / 10 / 25 / 50 km.
+- **Traffic filter.** Defaults to **YOW ONLY**: just the flights landing at or
+  taking off from Ottawa. **ALL** brings back overflights and everything else
+  in range. The airport is `HOME_AIRPORT` in `lib/config.ts`.
 - **Radar scope** for spatial context: click a blip to pin that flight.
 
 ## How arriving vs departing is decided
@@ -28,6 +31,11 @@ Route data is authoritative. If the flight's **destination** airport is within
 70 km of your station it is *arriving*; if the **origin** is, it is *departing*;
 if neither is, it is a *passing overflight*. When no route has been filed the
 app falls back to the vertical profile (low and descending vs low and climbing).
+
+In **YOW ONLY** mode the test is narrower: the filed origin or destination must
+be CYOW. With no route filed, an aircraft counts if it is within 25 km of YOW,
+below ~13,000 ft, and descending toward it or climbing away from it. Level
+aircraft above ~23,000 ft are dropped before any lookups.
 
 ## Stack
 

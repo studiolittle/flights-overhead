@@ -11,8 +11,9 @@ import {
 import { PHASE_LABEL } from "@/lib/classify";
 import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
 import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
-import type { Contact, FlightPhase } from "@/lib/types";
+import type { Contact, FlightPhase, TrackResponse } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
+import { FlightMap } from "./FlightMap";
 
 const PHASE_COLOR: Record<FlightPhase, string> = {
   arriving: "var(--color-accent-ink)",
@@ -72,11 +73,21 @@ export function FlightBoard({
   overhead,
   pinned,
   onClear,
+  station,
+  track,
+  trackLoading,
+  emptyTitle,
+  emptyText,
 }: {
   contact: Contact | null;
   overhead: boolean;
   pinned: boolean;
   onClear: () => void;
+  station: { lat: number; lon: number };
+  track: TrackResponse | null;
+  trackLoading: boolean;
+  emptyTitle: string;
+  emptyText: string;
 }) {
   if (!contact) {
     return (
@@ -86,10 +97,9 @@ export function FlightBoard({
           weight="bold"
           className="text-ink-faint"
         />
-        <p className="text-[15px] tracking-[0.2em] text-ink-dim">NOTHING IN RANGE</p>
+        <p className="text-[15px] tracking-[0.2em] text-ink-dim">{emptyTitle}</p>
         <p className="max-w-[38ch] text-center text-[13.5px] leading-relaxed text-ink-faint">
-          When an aircraft comes within range it appears here with its type and
-          route. Widen the range if your area is quiet.
+          {emptyText}
         </p>
       </div>
     );
@@ -235,6 +245,23 @@ export function FlightBoard({
             value={`${contact.distanceKm.toFixed(1)} km ${compass16(contact.bearingDeg)}`}
             tone={overhead ? "var(--color-alert)" : undefined}
           />
+        </div>
+
+        {/* Where it has flown, over real geography */}
+        <div className="border-t border-line pt-4">
+          <p className="text-[11.5px] tracking-[0.18em] text-ink-faint">
+            FLIGHT PATH
+          </p>
+          <div className="mt-2.5">
+            <FlightMap
+              track={track}
+              loading={trackLoading}
+              current={{ lat: contact.lat, lon: contact.lon }}
+              origin={e?.origin ?? null}
+              destination={e?.destination ?? null}
+              station={station}
+            />
+          </div>
         </div>
 
         {/* Fun facts about this aircraft type */}
