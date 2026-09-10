@@ -16,11 +16,15 @@ export function metersToFt(m: number | null): number | null {
   return m == null ? null : m * M_TO_FT;
 }
 
-/** Flight level above ~4000 ft, plain feet below it. */
+/**
+ * Plain feet below 18,000 ft, flight levels above. 18,000 ft is the transition
+ * altitude in Canadian airspace: only above it do crews switch their altimeters
+ * to the standard setting and start calling height a "flight level".
+ */
 export function flightLevel(baroM: number | null): string {
   if (baroM == null) return "--";
   const ft = baroM * M_TO_FT;
-  if (ft < 4000) return `${Math.round(ft / 10) * 10} ft`;
+  if (ft < 18000) return `${(Math.round(ft / 100) * 100).toLocaleString()} ft`;
   return `FL${String(Math.round(ft / 100)).padStart(3, "0")}`;
 }
 

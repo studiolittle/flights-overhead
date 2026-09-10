@@ -11,9 +11,10 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { PHASE_LABEL } from "@/lib/classify";
 import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
-import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
 import type { Contact, FlightPhase } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
+import { IdentityCodes, RouteNote } from "./CardExplainers";
+import { LiveNumbers } from "./LiveNumbers";
 
 const PHASE_COLOR: Record<FlightPhase, string> = {
   arriving: "var(--color-accent-ink)",
@@ -51,30 +52,6 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
       onError={() => setFailed(true)}
       className="h-[76px] w-[124px] border border-line object-cover"
     />
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11.5px] tracking-[0.18em] text-ink-faint">
-        {label}
-      </span>
-      <span
-        className="text-[17px] leading-none"
-        style={{ color: tone ?? "var(--color-ink)" }}
-      >
-        {value}
-      </span>
-    </div>
   );
 }
 
@@ -158,10 +135,6 @@ export function FlightBoard({
   const e = shown.enrichment;
   const cs = decodeCallsign(shown.callsign);
   const color = PHASE_COLOR[shown.phase];
-  const kt = msToKt(shown.velocityMs);
-  const fpm = msToFpm(shown.verticalRateMs);
-  const vs = shown.verticalRateMs ?? 0;
-  const vsArrow = vs > 0.5 ? "climb" : vs < -0.5 ? "descend" : "level";
   const squawk = squawkInfo(shown.squawk);
   const category = categoryLabel(shown.category);
 
@@ -274,11 +247,6 @@ export function FlightBoard({
             <p className="mt-1.5 text-[13.5px] text-ink-dim">
               {typeLine || "Aircraft type unavailable"}
             </p>
-            <p className="mt-1 text-[12.5px] text-ink-faint">
-              {[shown.callsign, shown.icao24.toUpperCase(), category]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
           </div>
           {e?.photoThumbUrl && (
             <AircraftPhoto
@@ -287,6 +255,9 @@ export function FlightBoard({
             />
           )}
         </div>
+
+        {/* What every code on the identity line means */}
+        <IdentityCodes contact={shown} />
 
         {/* Route */}
         {e?.origin || e?.destination ? (
@@ -319,30 +290,10 @@ export function FlightBoard({
           </p>
         )}
 
-        {/* Live numbers */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
-          <Stat label="ALTITUDE" value={flightLevel(shown.baroAltitudeM)} />
-          <Stat
-            label="GROUND SPEED"
-            value={kt != null ? `${Math.round(kt)} kt` : "--"}
-          />
-          <Stat
-            label={
-              vsArrow === "descend"
-                ? "DESCENDING"
-                : vsArrow === "climb"
-                  ? "CLIMBING"
-                  : "VERTICAL"
-            }
-            value={fpm != null ? `${Math.abs(Math.round(fpm))} fpm` : "--"}
-            tone={vsArrow === "level" ? undefined : color}
-          />
-          <Stat
-            label="DISTANCE"
-            value={`${shown.distanceKm.toFixed(1)} km ${compass16(shown.bearingDeg)}`}
-            tone={shownOverhead ? "var(--color-alert)" : undefined}
-          />
-        </div>
+        <RouteNote />
+
+        {/* Live numbers, each with a plain-language explainer */}
+        <LiveNumbers contact={shown} tone={color} overhead={shownOverhead} />
 
         {/* Fun facts about this aircraft type */}
         <AircraftFacts icaoType={e?.icaoType} />
