@@ -403,19 +403,35 @@ const BY_ICAO = new Map(FACTS.map((f) => [f.icao, f]));
  * fun facts about the A320 still apply, and so on.
  */
 const ALIASES: Record<string, string> = {
+  // A320 family
   A20N: "A320",
   A19N: "A319",
   A21N: "A321",
+  // A220 family
   BCS1: "BCS3",
+  // 737 MAX family
   B37M: "B38M",
   B39M: "B38M",
+  // 777 family (both facts are 777-general)
+  B77L: "B77W",
+  B772: "B77W",
+  B773: "B77W",
+  B77F: "B77W",
+  // 787 family (carbon fibre + dimming windows apply to all)
+  B789: "B788",
+  B78X: "B788",
+  // Embraer E-Jets
   E170: "E75L",
   E75S: "E75L",
   E190: "E295",
   E195: "E295",
-  C56X: "C560",
+  // CRJ family
+  CRJ7: "CRJ9",
+  // Dash 8 classic
   DH8A: "DH8C",
   DH8B: "DH8C",
+  // Business jets / historic
+  C56X: "C560",
   J60: "LJ60",
   T33: "T-33",
 };

@@ -13,14 +13,19 @@ function currentTheme(): Theme {
 }
 
 export function ThemeToggle() {
-  // The blocking script in layout.tsx already set data-theme; mirror it once
-  // mounted so the button reflects the real state and hydration stays clean.
+  // The blocking script in layout.tsx set data-theme before paint; mirror it
+  // once mounted so the switch reflects reality and hydration stays clean.
   const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
+  const [animate, setAnimate] = useState(false);
 
   useEffect(() => {
     setTheme(currentTheme());
     setMounted(true);
+    // Enable the slide transition only after the knob has painted in place,
+    // so it does not animate from the wrong side on first load.
+    const id = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   function toggle() {
@@ -34,25 +39,44 @@ export function ThemeToggle() {
     setTheme(next);
   }
 
-  const goingTo = theme === "dark" ? "light" : "dark";
+  const isDark = mounted && theme === "dark";
 
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={isDark}
+      aria-label={`Dark mode ${isDark ? "on" : "off"}`}
+      title={`Switch to ${isDark ? "light" : "dark"} mode`}
       onClick={toggle}
-      aria-label={`Switch to ${goingTo} mode`}
-      title={`Switch to ${goingTo} mode`}
-      /* grid, not flex: a flex child SVG takes its main-axis size from the
-         width attribute, ignoring the CSS size. grid places it cleanly. */
-      className="chip grid h-10 w-10 place-items-center p-0"
+      className="relative grid h-[26px] w-[52px] shrink-0 grid-cols-2 items-center border border-line-strong bg-surface-2 px-[3px]"
     >
-      {/* Render a neutral box until mounted to avoid a hydration mismatch. */}
-      {mounted && theme === "dark" ? (
-        <Sun size={22} weight="bold" />
-      ) : mounted ? (
-        <Moon size={22} weight="bold" />
-      ) : (
-        <span className="block h-[22px] w-[22px]" />
+      {/* Dim end markers; the knob covers the active one. */}
+      <Sun
+        size={13}
+        weight="bold"
+        className="justify-self-center text-ink-faint"
+      />
+      <Moon
+        size={13}
+        weight="bold"
+        className="justify-self-center text-ink-faint"
+      />
+
+      {mounted && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute left-[3px] grid h-[18px] w-[18px] place-items-center bg-accent text-on-accent ${
+            animate ? "transition-transform duration-200 ease-out" : ""
+          }`}
+          style={{ transform: `translate(${isDark ? 26 : 0}px, -50%)`, top: "50%" }}
+        >
+          {isDark ? (
+            <Moon size={12} weight="bold" />
+          ) : (
+            <Sun size={12} weight="bold" />
+          )}
+        </span>
       )}
     </button>
   );
