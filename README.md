@@ -81,7 +81,7 @@ All optional, all in `.env.local` (see `.env.example`):
 | `HOME_LAT` / `HOME_LON` | K2G 6P3, Nepean ON | Fallback before a postal code is set; see `lib/config.ts`. |
 | `RADAR_RANGE_KM` | `10` | Default range. |
 | `OVERHEAD_RADIUS_KM` | `2.5` | What counts as "overhead". |
-| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `25000` | Refresh interval, min 15000. |
+| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `40000` | Refresh interval, min 15000. At 40s a tab left open all day uses about half the authenticated OpenSky quota. |
 | `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` | _(none)_ | See below. |
 
 ### OpenSky credentials

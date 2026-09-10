@@ -25,13 +25,21 @@ import { OverheadLog, type LogEntry } from "./OverheadLog";
 import { RadarScope } from "./RadarScope";
 import { StatusBar } from "./StatusBar";
 
+/**
+ * 40s keeps a tab left open all day at roughly half the authenticated OpenSky
+ * daily quota (~2,160 requests vs a ~4,000 limit). Dead reckoning moves the
+ * blips between polls, so the board still reads as live.
+ */
 const POLL_MS = Math.max(
   15_000,
-  Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS) || 25_000,
+  Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS) || 40_000,
 );
 
-/** Cap dead reckoning so a stale snapshot never flies a blip off-scope. */
-const MAX_DR_SECONDS = 25;
+/**
+ * Cap dead reckoning so a stale snapshot never flies a blip off-scope. Must
+ * stay above POLL_MS or blips visibly freeze at the end of every cycle.
+ */
+const MAX_DR_SECONDS = 45;
 
 /** Do not re-alert for the same aircraft within this window. */
 const RENOTIFY_MS = 30 * 60 * 1000;
