@@ -300,13 +300,18 @@ export function RadarConsole() {
           weight="bold"
           className="mt-0.5 shrink-0 text-accent-ink"
         />
-        <p className="text-[13.5px] leading-relaxed text-ink-dim">
-          Welcome! I built this app for fun, to learn more about the
-          airplanes flying over my head while I&apos;m enjoying a beer in the
-          backyard. I hope you enjoy it and possibly learn something cool
-          about aviation.{" "}
-          <span className="text-ink-faint">&mdash; Jesse</span>
-        </p>
+        <div>
+          <h2 className="text-[13.5px] tracking-[0.14em] text-ink">
+            WELCOME
+          </h2>
+          <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-dim">
+            I built this app for fun and to learn more about the airplanes
+            flying over my head while in my backyard enjoying a beer (or 12).
+            I really hope you enjoy it. Crack open a beer and learn something
+            about aviation.{" "}
+            <span className="text-ink-faint">&mdash; Jesse</span>
+          </p>
+        </div>
       </div>
 
       {!mounted ? (
