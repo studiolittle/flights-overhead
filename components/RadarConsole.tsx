@@ -10,6 +10,7 @@ import { StationControls } from "./StationControls";
 import { FlightBoard, type BoardSlot } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
 import { LearningCentre } from "./LearningCentre";
+import { OnlineCount } from "./OnlineCount";
 import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -389,6 +390,7 @@ export function RadarConsole() {
             />
           </div>
         )}
+        {mounted && <OnlineCount />}
         <span>For fun. Enjoy :)</span>
         <a
           href="mailto:info@studiolittle.ca"
