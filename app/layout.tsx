@@ -14,14 +14,28 @@ export const metadata: Metadata = {
     "An arrivals board for the aircraft passing over your house: what it is, and where it came from.",
 };
 
+/**
+ * Resolves the theme to a concrete `data-theme` value before first paint:
+ * a saved choice wins, otherwise light. Runs synchronously so there is no
+ * flash of the wrong palette.
+ */
+const themeInit = `(function(){try{var s=localStorage.getItem('fo.theme');document.documentElement.dataset.theme=(s==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={spaceGrotesk.variable}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={spaceGrotesk.variable}
+    >
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {children}
+      </body>
     </html>
   );
 }

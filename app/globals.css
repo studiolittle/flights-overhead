@@ -1,22 +1,90 @@
 @import "tailwindcss";
 
-:root {
-  --bg: #05080a;
-  --panel: #090e11;
-  --panel-2: #0b1216;
-  --line: #16262a;
-  --line-bright: #22403b;
-  --text: #d7e6dd;
-  --text-dim: #6f8a7e;
-  --text-faint: #47584f;
-  --accent: #46e39a;
-  --accent-dim: #2f7d5c;
-  --warn: #ffb648;
-  --alert: #ff6060;
-  --grid: rgba(70, 227, 154, 0.1);
+/* ------------------------------------------------------------------ *
+ *  Design tokens
+ *
+ *  The palette is built on one accent (#ffd351) over a dark green-black
+ *  ground (#192221), with a full light counterpart. The raw `--c-*`
+ *  values swap on `[data-theme]`; `@theme inline` re-exports them as
+ *  Tailwind colour utilities (bg-canvas, text-ink, border-line, ...)
+ *  that follow the swap because `inline` makes the utilities reference
+ *  `--c-*` directly.
+ *
+ *  A blocking script in <body> resolves the theme to a concrete
+ *  `data-theme` before first paint, so CSS only needs two states.
+ * ------------------------------------------------------------------ */
 
-  color-scheme: dark;
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --c-canvas: #f3f5f1;
+  --c-surface: #ffffff;
+  --c-surface-2: #eef1ec;
+  --c-line: #dde3dc;
+  --c-line-strong: #c2cdc5;
+  --c-ink: #18211f;
+  --c-ink-dim: #4f5b54;
+  --c-ink-faint: #7e8a81;
+
+  --c-accent: #ffd351; /* brand fill: buttons, dots, sweep */
+  --c-accent-ink: #7a5f00; /* dark gold: readable accent text/strokes/icons */
+  --c-on-accent: #192221; /* text on an accent fill */
+
+  --c-depart: #b8560f; /* departing state */
+  --c-alert: #d33f3f; /* overhead / emergency */
+
+  --c-grid: rgb(30 41 38 / 0.14);
+  --c-sweep: 201 152 22; /* richer gold; #ffd351 at low alpha reads as beige */
+  --c-glow: transparent;
+  --c-vignette: rgb(24 33 31 / 0.05);
 }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --c-canvas: #192221;
+  --c-surface: #1f2b29;
+  --c-surface-2: #243230;
+  --c-line: #303f3b;
+  --c-line-strong: #43574f;
+  --c-ink: #e9efe9;
+  --c-ink-dim: #9aa9a1;
+  --c-ink-faint: #63736b;
+
+  --c-accent: #ffd351;
+  --c-accent-ink: #ffd351;
+  --c-on-accent: #192221;
+
+  --c-depart: #ff9d5c;
+  --c-alert: #ff6b6b;
+
+  --c-grid: rgb(255 211 81 / 0.11);
+  --c-sweep: 255 211 81;
+  --c-glow: rgb(255 211 81 / 0.42);
+  --c-vignette: rgb(0 0 0 / 0.45);
+}
+
+@theme inline {
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+  --color-ink: var(--c-ink);
+  --color-ink-dim: var(--c-ink-dim);
+  --color-ink-faint: var(--c-ink-faint);
+  --color-accent: var(--c-accent);
+  --color-accent-ink: var(--c-accent-ink);
+  --color-on-accent: var(--c-on-accent);
+  --color-depart: var(--c-depart);
+  --color-alert: var(--c-alert);
+  --color-grid: var(--c-grid);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Base
+ * ------------------------------------------------------------------ */
 
 * {
   box-sizing: border-box;
@@ -26,8 +94,8 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--c-canvas);
+  color: var(--c-ink);
 }
 
 body {
@@ -40,6 +108,7 @@ body {
      Inherited, so SVG <text> in the radar picks it up too. */
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 /* Static vignette. Fixed + pointer-events:none, no scroll repaint cost. */
@@ -52,53 +121,55 @@ body::after {
   background: radial-gradient(
     ellipse at center,
     transparent 52%,
-    rgba(0, 0, 0, 0.5) 100%
+    var(--c-vignette) 100%
   );
 }
 
+/* ------------------------------------------------------------------ *
+ *  Components. One shape system: every surface is square-cornered.
+ * ------------------------------------------------------------------ */
+
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
   border-radius: 0;
 }
 
 .glow {
-  text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent);
+  text-shadow: 0 0 14px var(--c-glow);
 }
 
-/* --- Controls. One shape system: every control is square-cornered. --- */
-
 .field {
-  background: var(--panel-2);
-  border: 1px solid var(--line-bright);
+  background: var(--c-surface-2);
+  border: 1px solid var(--c-line-strong);
   border-radius: 0;
-  color: var(--text);
+  color: var(--c-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: 0.08em;
-  padding: 0.45rem 0.6rem;
+  padding: 0.5rem 0.7rem;
 }
 
 .field::placeholder {
-  color: var(--text-dim);
+  color: var(--c-ink-dim);
   letter-spacing: 0.08em;
 }
 
 .btn {
-  background: var(--accent);
-  border: 1px solid var(--accent);
+  background: var(--c-accent);
+  border: 1px solid var(--c-accent);
   border-radius: 0;
-  color: #04120b;
+  color: var(--c-on-accent);
   cursor: pointer;
   font: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 0.18em;
-  padding: 0.5rem 0.85rem;
-  transition: background 150ms ease, transform 120ms ease;
+  padding: 0.55rem 0.95rem;
+  transition: filter 150ms ease, transform 120ms ease;
 }
 
 .btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 85%, white);
+  filter: brightness(1.08);
 }
 
 .btn:active:not(:disabled) {
@@ -112,20 +183,20 @@ body::after {
 
 .chip {
   background: transparent;
-  border: 1px solid var(--line-bright);
+  border: 1px solid var(--c-line-strong);
   border-radius: 0;
-  color: var(--text-dim);
+  color: var(--c-ink-dim);
   cursor: pointer;
   font: inherit;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 0.14em;
-  padding: 0.4rem 0.6rem;
+  padding: 0.45rem 0.7rem;
   transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 
 .chip:hover:not(:disabled) {
-  border-color: var(--accent-dim);
-  color: var(--text);
+  border-color: var(--c-accent-ink);
+  color: var(--c-ink);
 }
 
 .chip:disabled {
@@ -134,9 +205,9 @@ body::after {
 }
 
 .chip-on {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
+  border-color: var(--c-accent-ink);
+  color: var(--c-accent-ink);
 }
 
 .row {
@@ -155,12 +226,12 @@ body::after {
 }
 
 .row:hover {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  background: color-mix(in srgb, var(--c-accent) 7%, transparent);
 }
 
 .row-on {
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  border-left-color: var(--accent);
+  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
+  border-left-color: var(--c-accent-ink);
 }
 
 /* Visible keyboard focus on every interactive surface. */
@@ -169,13 +240,15 @@ body::after {
 .chip:focus-visible,
 .row:focus-visible,
 .blip:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--c-accent-ink);
   outline-offset: 2px;
 }
 
-/* --- Radar motion. Each animation earns its place:
-   sweep = the feed is scanning, blip-in = a new contact appeared,
-   pulse = something is directly overhead, live-dot = link is up. --- */
+/* ------------------------------------------------------------------ *
+ *  Radar motion. Each animation earns its place:
+ *  sweep = the feed is scanning, blip-in = a new contact appeared,
+ *  pulse = something is directly overhead, live-dot = link is up.
+ * ------------------------------------------------------------------ */
 
 @keyframes radar-spin {
   to {
@@ -233,10 +306,10 @@ body::after {
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    transparent 260deg,
-    color-mix(in srgb, var(--accent) 3%, transparent) 315deg,
-    color-mix(in srgb, var(--accent) 12%, transparent) 348deg,
-    color-mix(in srgb, var(--accent) 30%, transparent) 359deg,
+    transparent 258deg,
+    rgb(var(--c-sweep) / 0.05) 315deg,
+    rgb(var(--c-sweep) / 0.18) 348deg,
+    rgb(var(--c-sweep) / 0.42) 359deg,
     transparent 360deg
   );
   animation: radar-spin 4.5s linear infinite;
@@ -250,11 +323,7 @@ body::after {
   top: 0;
   height: 50%;
   width: 2px;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--accent) 55%, transparent),
-    transparent
-  );
+  background: linear-gradient(to bottom, rgb(var(--c-sweep) / 0.7), transparent);
 }
 
 .live-dot {
@@ -284,9 +353,12 @@ body::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
   .radar-sweep {
     animation: none;
-    opacity: 0.1;
+    opacity: 0.12;
   }
   .live-dot,
   .blip-body,

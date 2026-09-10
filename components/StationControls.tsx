@@ -44,7 +44,7 @@ export function StationControls({
       <form onSubmit={submit} className="flex flex-col gap-1.5">
         <label
           htmlFor="station"
-          className="text-[10px] tracking-[0.22em] text-[var(--text-dim)]"
+          className="text-[11.5px] tracking-[0.22em] text-ink-dim"
         >
           STATION
         </label>
@@ -68,9 +68,7 @@ export function StationControls({
 
       {/* Range */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] tracking-[0.22em] text-[var(--text-dim)]">
-          RANGE
-        </span>
+        <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">RANGE</span>
         <div className="flex items-center gap-1.5">
           {RANGE_PRESETS.map((km) => (
             <button
@@ -83,15 +81,13 @@ export function StationControls({
               {km}
             </button>
           ))}
-          <span className="ml-1 text-[11px] text-[var(--text-faint)]">KM</span>
+          <span className="ml-1 text-[12.5px] text-ink-faint">KM</span>
         </div>
       </div>
 
       {/* Alerts */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] tracking-[0.22em] text-[var(--text-dim)]">
-          ALERTS
-        </span>
+        <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">ALERTS</span>
         <button
           type="button"
           onClick={onToggleNotify}
@@ -117,19 +113,17 @@ export function StationControls({
       {/* Resolved location / error */}
       <p
         id="station-help"
-        className="flex min-h-[18px] items-center gap-1.5 text-[11px] lg:ml-auto lg:pb-1"
+        className="flex min-h-[18px] items-center gap-1.5 text-[12.5px] lg:ml-auto lg:pb-1"
       >
         {error ? (
-          <span className="text-[var(--warn)]">{error}</span>
+          <span className="text-depart">{error}</span>
         ) : stationLabel ? (
           <>
-            <MapPin size={13} weight="bold" className="text-[var(--accent)]" />
-            <span className="text-[var(--text-dim)]">{stationLabel}</span>
+            <MapPin size={13} weight="bold" className="text-accent-ink" />
+            <span className="text-ink-dim">{stationLabel}</span>
           </>
         ) : (
-          <span className="text-[var(--text-faint)]">
-            Postal code, ZIP or place name
-          </span>
+          <span className="text-ink-faint">Postal code, ZIP or place name</span>
         )}
       </p>
     </div>

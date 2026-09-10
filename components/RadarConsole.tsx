@@ -5,7 +5,6 @@ import { Broadcast } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { decodeCallsign } from "@/lib/aircraft";
 import { PHASE_LABEL } from "@/lib/classify";
-import { flightLevel } from "@/lib/format";
 import {
   fireNotification,
   notifyState,
@@ -16,9 +15,9 @@ import type { ApiResponse, Contact, Station } from "@/lib/types";
 import { StationControls } from "./StationControls";
 import { FlightBoard } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
-import { OverheadLog, type LogEntry } from "./OverheadLog";
 import { RadarScope } from "./RadarScope";
 import { StatusBar } from "./StatusBar";
+import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * 40s is easy on a free community feed: a tab left open all day makes ~2,160
@@ -39,10 +38,8 @@ const MAX_DR_SECONDS = 45;
 /** Do not re-alert for the same aircraft within this window. */
 const RENOTIFY_MS = 30 * 60 * 1000;
 
-const LOG_LIMIT = 40;
 const KEY_STATION = "fo.station";
 const KEY_RANGE = "fo.range";
-const KEY_LOG = "fo.log";
 
 function readStore<T>(key: string): T | null {
   try {
@@ -70,7 +67,6 @@ export function RadarConsole() {
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [log, setLog] = useState<LogEntry[]>([]);
   const [notify, setNotify] = useState<NotifyState>("default");
 
   const [resolving, setResolving] = useState(false);
@@ -84,11 +80,9 @@ export function RadarConsole() {
   useEffect(() => {
     const storedStation = readStore<Station>(KEY_STATION);
     const storedRange = readStore<number>(KEY_RANGE);
-    const storedLog = readStore<LogEntry[]>(KEY_LOG);
 
     if (storedStation) setStation(storedStation);
     if (typeof storedRange === "number") setRangeKm(storedRange);
-    if (Array.isArray(storedLog)) setLog(storedLog);
 
     setNotify(notifyState());
     setNowTs(Date.now());
@@ -185,7 +179,9 @@ export function RadarConsole() {
     if (live.length === 0) return null;
     const overheadNow = live.find((c) => c.distanceKm <= overheadRadius);
     if (overheadNow) return overheadNow;
-    const meaningful = live.find((c) => c.phase === "arriving" || c.phase === "departing");
+    const meaningful = live.find(
+      (c) => c.phase === "arriving" || c.phase === "departing",
+    );
     return meaningful ?? live[0];
   }, [live, overheadRadius]);
 
@@ -195,11 +191,10 @@ export function RadarConsole() {
   const boardOverhead =
     boardContact != null && boardContact.distanceKm <= overheadRadius;
 
-  // --- overhead alerts + log ------------------------------------------------
+  // --- overhead alerts ----------------------------------------------------
   useEffect(() => {
     if (!data) return;
     const now = Date.now();
-    const fresh: LogEntry[] = [];
 
     for (const c of data.contacts) {
       if (c.distanceKm > data.overheadRadiusKm) continue;
@@ -214,43 +209,24 @@ export function RadarConsole() {
         e?.manufacturer && e?.type
           ? `${e.manufacturer} ${e.type}`
           : (e?.type ?? e?.icaoType ?? null);
-      const route =
-        e?.origin?.iata && e?.destination?.iata
-          ? `${e.origin.iata} → ${e.destination.iata}`
-          : null;
       const routeWords =
         e?.origin?.municipality && e?.destination?.municipality
           ? `${e.origin.municipality} → ${e.destination.municipality}`
-          : route;
-
-      fresh.push({
-        id: c.id,
-        at: now,
-        callsign: c.callsign,
-        operator,
-        phase: c.phase,
-        type: e?.icaoType ?? type,
-        route,
-        altitude: flightLevel(c.baroAltitudeM),
-      });
+          : e?.origin?.iata && e?.destination?.iata
+            ? `${e.origin.iata} → ${e.destination.iata}`
+            : null;
 
       const title = PHASE_LABEL[c.phase];
       const body = [
-        operator && cs.flightNumber ? `${operator} ${cs.flightNumber}` : c.callsign,
+        operator && cs.flightNumber
+          ? `${operator} ${cs.flightNumber}`
+          : c.callsign,
         type,
         routeWords,
       ]
         .filter(Boolean)
         .join(" · ");
       fireNotification(title, body, `fo-${c.id}`);
-    }
-
-    if (fresh.length > 0) {
-      setLog((prev) => {
-        const next = [...fresh, ...prev].slice(0, LOG_LIMIT);
-        writeStore(KEY_LOG, next);
-        return next;
-      });
     }
   }, [data]);
 
@@ -290,38 +266,39 @@ export function RadarConsole() {
   }, []);
 
   const toggleNotify = useCallback(async () => {
-    const state = notifyState();
-    if (state === "granted") {
-      // The API has no revoke; point the user at their browser settings.
+    if (notifyState() === "granted") {
       setNotify("granted");
       return;
     }
     setNotify(await requestNotifyPermission());
   }, []);
 
-  const clearLog = useCallback(() => {
-    setLog([]);
-    writeStore(KEY_LOG, []);
-  }, []);
-
   const loading = !data && !fetchError;
 
   return (
     <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Broadcast size={20} weight="bold" className="text-[var(--accent)]" />
-          <h1 className="text-sm tracking-[0.35em] text-[var(--text)]">
-            FLIGHTS OVERHEAD
-          </h1>
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <Broadcast size={26} weight="bold" className="text-accent-ink" />
+          <div className="flex flex-col gap-0.5">
+            <h1 className="text-[19px] leading-none tracking-[0.3em] text-ink">
+              FLIGHTS OVERHEAD
+            </h1>
+            <span className="text-[12px] tracking-[0.14em] text-ink-dim">
+              Built by Jesse Little
+            </span>
+          </div>
         </div>
-        <span className="hidden text-[11px] tracking-[0.2em] text-[var(--text-dim)] sm:block">
-          LIVE ADS-B · ADSB.LOL + ADSBDB
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="hidden text-[12.5px] tracking-[0.2em] text-ink-dim sm:block">
+            LIVE ADS-B · ADSB.LOL + ADSBDB
+          </span>
+          <ThemeToggle />
+        </div>
       </header>
 
       {!mounted ? (
-        <div className="panel flex flex-1 items-center justify-center p-8 text-sm tracking-[0.2em] text-[var(--text-dim)]">
+        <div className="panel flex flex-1 items-center justify-center p-8 text-[15px] tracking-[0.2em] text-ink-dim">
           INITIALISING
         </div>
       ) : (
@@ -353,10 +330,10 @@ export function RadarConsole() {
             nowTs={nowTs || Date.now()}
           />
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]">
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
             {/* min-w-0: grid items default to min-width:auto and would
                 otherwise refuse to shrink below their longest text. */}
-            <div className="flex min-w-0 flex-col gap-4">
+            <div className="min-w-0">
               <FlightBoard
                 contact={boardContact}
                 overhead={boardOverhead}
@@ -364,34 +341,40 @@ export function RadarConsole() {
                 onClear={() => setSelectedId(null)}
                 station={home}
               />
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4">
+              <section className="panel flex justify-center p-4">
+                {/* Cap the square so it does not balloon to full width on a
+                    single-column (tablet / narrow) layout. */}
+                <div className="w-full max-w-[400px]">
+                  <RadarScope
+                    contacts={live}
+                    rangeKm={effectiveRange}
+                    overheadRadiusKm={overheadRadius}
+                    loading={loading}
+                    selectedId={selectedId}
+                    onSelect={(id) =>
+                      setSelectedId((cur) => (cur === id ? null : id))
+                    }
+                  />
+                </div>
+              </section>
               <InRangeList
                 contacts={live}
                 selectedId={selectedId}
                 overheadRadiusKm={overheadRadius}
-                onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
+                onSelect={(id) =>
+                  setSelectedId((cur) => (cur === id ? null : id))
+                }
               />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-4">
-              <section className="panel p-4">
-                <RadarScope
-                  contacts={live}
-                  station={home}
-                  rangeKm={effectiveRange}
-                  overheadRadiusKm={overheadRadius}
-                  loading={loading}
-                  selectedId={selectedId}
-                  onSelect={(id) => setSelectedId((cur) => (cur === id ? null : id))}
-                />
-              </section>
-              <OverheadLog entries={log} onClear={clearLog} />
             </div>
           </div>
         </>
       )}
 
-      <footer className="mt-auto border-t border-[var(--line)] pt-4 text-center text-[11px] tracking-[0.14em] text-[var(--text-faint)]">
-        Built by Jesse Little, for fun. Enjoy :)
+      <footer className="mt-auto border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
+        For fun. Enjoy :)
       </footer>
     </main>
   );

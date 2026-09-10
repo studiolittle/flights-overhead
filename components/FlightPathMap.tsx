@@ -4,8 +4,9 @@ import { toRad } from "@/lib/geo";
 import type { AirportRef } from "@/lib/types";
 
 const W = 640;
-const H = 240;
-const PAD = 34;
+const PAD = 26;
+const H_MIN = 120;
+const H_MAX = 250;
 const ARC_STEPS = 48;
 
 interface Pt {
@@ -94,7 +95,13 @@ export function FlightPathMap({
 
   const spanX = maxX - minX || 1e-6;
   const spanY = maxY - minY || 1e-6;
-  const scale = Math.min((W - PAD * 2) / spanX, (H - PAD * 2) / spanY);
+
+  // Fit to width, then let the viewBox height follow the route's own aspect
+  // (clamped) so a near-horizontal leg is not marooned in a tall empty box.
+  // A very vertical route refits so it never overflows the max height.
+  const fitW = (W - PAD * 2) / spanX;
+  const scale = Math.min(fitW, (H_MAX - PAD * 2) / spanY);
+  const H = Math.max(H_MIN, Math.min(H_MAX, spanY * scale + PAD * 2));
   const offX = (W - spanX * scale) / 2;
   const offY = (H - spanY * scale) / 2;
 
@@ -116,7 +123,7 @@ export function FlightPathMap({
     <figure className="m-0">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="block h-auto w-full"
+        className="block h-auto w-full max-w-[560px]"
         role="img"
         aria-label={`Route from ${airportName(origin)} to ${airportName(destination)}`}
       >
@@ -124,9 +131,9 @@ export function FlightPathMap({
           <polyline
             points={toPoly(flown)}
             fill="none"
-            stroke="var(--accent)"
+            stroke="var(--color-accent-ink)"
             strokeWidth={2}
-            strokeOpacity={0.7}
+            strokeOpacity={0.75}
             strokeLinecap="round"
           />
         )}
@@ -134,7 +141,7 @@ export function FlightPathMap({
           <polyline
             points={toPoly(remaining)}
             fill="none"
-            stroke="var(--text-dim)"
+            stroke="var(--color-ink-dim)"
             strokeWidth={2}
             strokeOpacity={0.55}
             strokeDasharray="6 6"
@@ -148,7 +155,7 @@ export function FlightPathMap({
             cy={project(from).y}
             r={4.5}
             fill="none"
-            stroke="var(--text-dim)"
+            stroke="var(--color-ink-dim)"
             strokeWidth={2}
           />
         )}
@@ -158,26 +165,33 @@ export function FlightPathMap({
             cy={project(to).y}
             r={4.5}
             fill="none"
-            stroke="var(--text-dim)"
+            stroke="var(--color-ink-dim)"
             strokeWidth={2}
           />
         )}
 
         {/* your station */}
-        <circle cx={home.x} cy={home.y} r={9} fill="none" stroke="var(--alert)" strokeWidth={1.5} strokeDasharray="3 4" />
-        <circle cx={home.x} cy={home.y} r={2.5} fill="var(--alert)" />
+        <circle
+          cx={home.x}
+          cy={home.y}
+          r={9}
+          fill="none"
+          stroke="var(--color-alert)"
+          strokeWidth={1.5}
+          strokeDasharray="3 4"
+        />
+        <circle cx={home.x} cy={home.y} r={2.5} fill="var(--color-alert)" />
 
         {/* current position */}
-        <circle cx={here.x} cy={here.y} r={5.5} fill="var(--accent)" />
+        <circle cx={here.x} cy={here.y} r={5.5} fill="var(--color-accent-ink)" />
       </svg>
 
-      <figcaption className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[var(--text-faint)]">
+      <figcaption className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-ink-faint">
         <span>
-          <span className="text-[var(--text-dim)]">Flown</span>{" "}
-          {airportName(origin)}
+          <span className="text-ink-dim">Flown</span> {airportName(origin)}
         </span>
         <span>
-          <span className="text-[var(--text-dim)]">Remaining</span>{" "}
+          <span className="text-ink-dim">Remaining</span>{" "}
           {airportName(destination)}
         </span>
       </figcaption>

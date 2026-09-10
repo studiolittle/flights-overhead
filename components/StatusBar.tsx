@@ -27,8 +27,8 @@ export function StatusBar({
   const age = snapshotAt ? ageLabel(nowTs - snapshotAt) : "--";
 
   return (
-    <div className="panel flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 text-[11px] tracking-[0.12em] text-[var(--text-dim)]">
-      <span className="flex items-center gap-2 text-[var(--accent)]">
+    <div className="panel flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 text-[12.5px] tracking-[0.12em] text-ink-dim">
+      <span className="flex items-center gap-2 text-accent-ink">
         <Broadcast
           size={14}
           weight="bold"
@@ -45,7 +45,7 @@ export function StatusBar({
       </span>
 
       {stale && (
-        <span className="flex items-center gap-1.5 text-[var(--warn)]">
+        <span className="flex items-center gap-1.5 text-depart">
           <Warning size={13} weight="bold" />
           {error ? error.toUpperCase() : "FEED STALE"}
         </span>
