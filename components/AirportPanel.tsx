@@ -181,8 +181,9 @@ export function AirportPanel({
         </span>
       </div>
 
-      <div className="grid gap-6 p-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-        <div className="mx-auto w-full max-w-[560px]">
+      {/* Sits in the narrow side column, so everything stacks. */}
+      <div className="flex flex-col gap-5 p-5">
+        <div className="mx-auto w-full max-w-[340px]">
           <AirportScope
             contacts={contacts}
             station={station}

@@ -64,8 +64,8 @@ export function StationControls({
           id="station-hint"
           className="text-[12px] leading-snug text-ink-faint"
         >
-          Your postal code, ZIP or city. Marks your spot on the radar so it can
-          flag a flight passing over you.
+          Your postal code, ZIP or city. Marks your spot so the app can flag a
+          flight passing over you.
         </p>
       </form>
 
@@ -87,8 +87,8 @@ export function StationControls({
           <span className="ml-1 text-[12.5px] text-ink-faint">KM</span>
         </div>
         <p className="text-[12px] leading-snug text-ink-faint">
-          How far around the airport the radar reaches. 50 km covers the whole
-          approach.
+          How far around the airport to look for arrivals and departures. 50 km
+          covers the whole approach.
         </p>
       </div>
 

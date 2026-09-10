@@ -4,40 +4,44 @@ import { useEffect, useRef, useState } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
-  AirplaneInFlight,
   ArrowRight,
   BeerStein,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { PHASE_LABEL } from "@/lib/classify";
 import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
-import type { Contact, FlightPhase } from "@/lib/types";
+import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
+import type { Contact } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
-import { IdentityCodes, RouteNote } from "./CardExplainers";
-import { LiveNumbers } from "./LiveNumbers";
 
-const PHASE_COLOR: Record<FlightPhase, string> = {
-  arriving: "var(--color-accent-ink)",
-  departing: "var(--color-depart)",
-  overflight: "var(--color-ink-dim)",
-  unknown: "var(--color-ink-dim)",
-};
+/** Which side of the board this is. */
+export type BoardSlot = "arriving" | "departing";
 
 /**
- * Arrivals and departures are the board's headline event, so they get a solid
- * banner, and the whole card takes on a tint of the same colour.
+ * Arrivals and departures each get their own colour: a solid banner, and the
+ * whole card takes on a tint of it.
  */
-const PHASE_BANNER: Partial<Record<FlightPhase, { bg: string; fg: string }>> = {
-  arriving: { bg: "var(--color-accent)", fg: "var(--color-on-accent)" },
-  departing: { bg: "var(--color-depart)", fg: "var(--color-on-depart)" },
+const SLOT_STYLE: Record<BoardSlot, { ink: string; bg: string; fg: string }> = {
+  arriving: {
+    ink: "var(--color-accent-ink)",
+    bg: "var(--color-accent)",
+    fg: "var(--color-on-accent)",
+  },
+  departing: {
+    ink: "var(--color-depart)",
+    bg: "var(--color-depart)",
+    fg: "var(--color-on-depart)",
+  },
 };
 
 /** Takes its colour from the surrounding text. */
-function PhaseIcon({ phase, size }: { phase: FlightPhase; size: number }) {
+function SlotIcon({ slot, size }: { slot: BoardSlot; size: number }) {
   const props = { size, weight: "bold" as const };
-  if (phase === "arriving") return <AirplaneLanding {...props} />;
-  if (phase === "departing") return <AirplaneTakeoff {...props} />;
-  return <AirplaneInFlight {...props} />;
+  return slot === "arriving" ? (
+    <AirplaneLanding {...props} />
+  ) : (
+    <AirplaneTakeoff {...props} />
+  );
 }
 
 function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
@@ -50,8 +54,32 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="h-[76px] w-[124px] border border-line object-cover"
+      className="h-[68px] w-[110px] border border-line object-cover"
     />
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11.5px] tracking-[0.18em] text-ink-faint">
+        {label}
+      </span>
+      <span
+        className="text-[17px] leading-none"
+        style={{ color: tone ?? "var(--color-ink)" }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -62,19 +90,23 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
  */
 const BOARD_SWAP_MS = 200;
 
+/**
+ * One side of the board: the flight currently leading arrivals or departures,
+ * kept to the essentials. The Learning Centre explains the terms.
+ */
 export function FlightBoard({
+  slot,
   contact,
   overhead,
   pinned,
   onClear,
-  emptyTitle,
   emptyText,
 }: {
+  slot: BoardSlot;
   contact: Contact | null;
   overhead: boolean;
   pinned: boolean;
   onClear: () => void;
-  emptyTitle: string;
   emptyText: string;
 }) {
   // What is actually on screen right now. It lags `contact` by one swap
@@ -84,7 +116,7 @@ export function FlightBoard({
   const [shown, setShown] = useState(contact);
   const [shownOverhead, setShownOverhead] = useState(overhead);
   const [shownPinned, setShownPinned] = useState(pinned);
-  const [phase, setPhase] = useState<"idle" | "leaving" | "entering">("idle");
+  const [swap, setSwap] = useState<"idle" | "leaving" | "entering">("idle");
   /** The flight id currently on screen — only this identity change animates. */
   const shownId = useRef<string | null>(contact?.id ?? null);
 
@@ -99,42 +131,50 @@ export function FlightBoard({
     }
     // A different flight (or the empty state) is taking over the board:
     // fade the current content out, then swap and fade the new content in.
-    setPhase("leaving");
+    setSwap("leaving");
     const timer = setTimeout(() => {
       shownId.current = nextId;
       setShown(contact);
       setShownOverhead(overhead);
       setShownPinned(pinned);
-      setPhase("entering");
+      setSwap("entering");
       // Paint the entering (offset, transparent) state once before flipping
       // to idle, so the browser has something to transition away from.
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => setPhase("idle"));
+        requestAnimationFrame(() => setSwap("idle"));
       });
     }, BOARD_SWAP_MS);
     return () => clearTimeout(timer);
   }, [contact, overhead, pinned]);
 
   const swapClass =
-    phase === "leaving" ? "board-leave" : phase === "entering" ? "board-enter" : "";
+    swap === "leaving" ? "board-leave" : swap === "entering" ? "board-enter" : "";
+  const style = SLOT_STYLE[slot];
 
   if (!shown) {
     return (
-      <div
-        className={`panel board-swap ${swapClass} flex min-h-[260px] flex-col items-center justify-center gap-3 p-6`}
-      >
-        <BeerStein size={26} weight="bold" className="text-accent-ink" />
-        <p className="text-[15px] tracking-[0.2em] text-ink-dim">{emptyTitle}</p>
-        <p className="max-w-[38ch] text-center text-[13.5px] leading-relaxed text-ink-faint">
-          {emptyText}
-        </p>
+      <div className={`panel board-swap ${swapClass} flex flex-col`}>
+        <div
+          className="flex items-center gap-3 border-b border-line px-5 py-3"
+          style={{ borderLeft: `4px solid ${style.ink}`, color: style.ink }}
+        >
+          <SlotIcon slot={slot} size={20} />
+          <span className="whitespace-nowrap text-[15px] leading-none tracking-[0.28em]">
+            {PHASE_LABEL[slot]}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 px-5 py-6">
+          <BeerStein size={22} weight="bold" className="shrink-0 text-accent-ink" />
+          <p className="text-[13.5px] leading-relaxed text-ink-faint">
+            {emptyText}
+          </p>
+        </div>
       </div>
     );
   }
 
   const e = shown.enrichment;
   const cs = decodeCallsign(shown.callsign);
-  const color = PHASE_COLOR[shown.phase];
   const squawk = squawkInfo(shown.squawk);
   const category = categoryLabel(shown.category);
 
@@ -153,54 +193,35 @@ export function FlightBoard({
     .filter(Boolean)
     .join(" · ");
 
-  const banner = PHASE_BANNER[shown.phase];
+  const kt = msToKt(shown.velocityMs);
+  const fpm = msToFpm(shown.verticalRateMs);
+  const vs = shown.verticalRateMs ?? 0;
+  const vsLabel = vs > 0.5 ? "CLIMBING" : vs < -0.5 ? "DESCENDING" : "VERTICAL";
 
   return (
     <div
       className={`panel board-swap ${swapClass} flex flex-col`}
-      style={
-        banner
-          ? {
-              borderColor: banner.bg,
-              background: `color-mix(in srgb, ${banner.bg} 7%, var(--color-surface))`,
-            }
-          : undefined
-      }
+      style={{
+        borderColor: style.bg,
+        background: `color-mix(in srgb, ${style.bg} 7%, var(--color-surface))`,
+      }}
     >
-      {/* Phase header: a solid banner for arrivals and departures, a
-          coloured rule for anything else. */}
       <div
-        className={`flex flex-wrap items-center gap-x-4 gap-y-2 px-5 ${
-          banner ? "py-4" : "border-b border-line py-3"
-        }`}
-        style={
-          banner
-            ? { background: banner.bg, color: banner.fg }
-            : { borderLeft: `4px solid ${color}`, color }
-        }
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5"
+        style={{ background: style.bg, color: style.fg }}
       >
         <span className={shownOverhead ? "pulse-soft" : undefined}>
-          <PhaseIcon phase={shown.phase} size={banner ? 30 : 22} />
+          <SlotIcon slot={slot} size={26} />
         </span>
-        <span
-          className={`whitespace-nowrap leading-none ${
-            banner
-              ? "text-[22px] font-semibold tracking-[0.2em] md:text-[26px]"
-              : "text-[15px] tracking-[0.28em]"
-          }`}
-        >
-          {PHASE_LABEL[shown.phase]}
+        <span className="whitespace-nowrap text-[19px] font-semibold leading-none tracking-[0.2em] md:text-[22px]">
+          {PHASE_LABEL[slot]}
         </span>
 
         {shownOverhead && (
           <span
-            className={`whitespace-nowrap px-2 py-0.5 text-[11.5px] tracking-[0.2em] ${
-              banner ? "font-semibold" : "border border-alert text-alert"
-            }`}
+            className="whitespace-nowrap px-2 py-0.5 text-[11.5px] font-semibold tracking-[0.2em]"
             // Inverted on the banner: red on gold is too low-contrast.
-            style={
-              banner ? { background: banner.fg, color: banner.bg } : undefined
-            }
+            style={{ background: style.fg, color: style.bg }}
           >
             OVERHEAD NOW
           </span>
@@ -212,11 +233,7 @@ export function FlightBoard({
         )}
 
         <span className="ml-auto flex items-center gap-3">
-          <span
-            className={`text-[11.5px] tracking-[0.2em] ${
-              banner ? "opacity-70" : "text-ink-faint"
-            }`}
-          >
+          <span className="text-[11.5px] tracking-[0.2em] opacity-70">
             {shownPinned ? "PINNED" : "AUTO"}
           </span>
           {shownPinned && (
@@ -224,11 +241,7 @@ export function FlightBoard({
               type="button"
               onClick={onClear}
               className="chip flex items-center gap-1.5"
-              style={
-                banner
-                  ? { borderColor: banner.fg, color: banner.fg }
-                  : undefined
-              }
+              style={{ borderColor: style.fg, color: style.fg }}
             >
               <X size={11} weight="bold" />
               CLEAR
@@ -237,11 +250,11 @@ export function FlightBoard({
         </span>
       </div>
 
-      <div className="flex flex-col gap-5 p-5">
+      <div className="flex flex-col gap-4 p-5">
         {/* Identity */}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-[26px] leading-[1.12] text-pretty break-words text-ink md:text-[34px]">
+            <h2 className="text-[24px] leading-[1.12] text-pretty break-words text-ink md:text-[30px]">
               {title}
             </h2>
             <p className="mt-1.5 text-[13.5px] text-ink-dim">
@@ -256,19 +269,16 @@ export function FlightBoard({
           )}
         </div>
 
-        {/* What every code on the identity line means */}
-        <IdentityCodes contact={shown} />
-
         {/* Route */}
         {e?.origin || e?.destination ? (
-          <div className="border-y border-line py-4">
-            <div className="flex items-center gap-4">
+          <div>
+            <div className="flex items-center gap-3">
               <Endpoint
                 code={e?.origin?.iata ?? e?.origin?.icao}
                 city={e?.origin?.municipality ?? e?.origin?.name}
               />
               <ArrowRight
-                size={20}
+                size={16}
                 weight="bold"
                 className="shrink-0 text-ink-faint"
               />
@@ -278,24 +288,42 @@ export function FlightBoard({
               />
             </div>
             {e?.staleRoute && (
-              <p className="mt-2.5 text-[12.5px] leading-snug text-ink-faint">
+              <p className="mt-2 text-[12.5px] leading-snug text-ink-faint">
                 The route on file for this flight number ({e.staleRoute}) is
                 out of date, so only the Ottawa end is shown.
               </p>
             )}
           </div>
         ) : (
-          <p className="border-y border-line py-4 text-[13.5px] text-ink-faint">
+          <p className="text-[13.5px] text-ink-faint">
             No route filed for this callsign.
           </p>
         )}
 
-        <RouteNote />
+        {/* Live numbers */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-t border-line pt-4 sm:grid-cols-4">
+          <Stat label="ALTITUDE" value={flightLevel(shown.baroAltitudeM)} />
+          <Stat
+            label="GROUND SPEED"
+            value={kt != null ? `${Math.round(kt)} kt` : "--"}
+          />
+          <Stat
+            label={vsLabel}
+            value={
+              fpm != null
+                ? `${Math.abs(Math.round(fpm)).toLocaleString()} fpm`
+                : "--"
+            }
+            tone={vsLabel === "VERTICAL" ? undefined : style.ink}
+          />
+          <Stat
+            label="DISTANCE"
+            value={`${shown.distanceKm.toFixed(1)} km ${compass16(shown.bearingDeg)}`}
+            tone={shownOverhead ? "var(--color-alert)" : undefined}
+          />
+        </div>
 
-        {/* Live numbers, each with a plain-language explainer */}
-        <LiveNumbers contact={shown} tone={color} overhead={shownOverhead} />
-
-        {/* Fun facts about this aircraft type */}
+        {/* Fun facts about this aircraft type, always shown */}
         <AircraftFacts icaoType={e?.icaoType} />
       </div>
     </div>
@@ -310,11 +338,11 @@ function Endpoint({
   city: string | null | undefined;
 }) {
   return (
-    <div className="min-w-0 flex-1">
-      <p className="text-[23px] leading-none text-ink">{code ?? "???"}</p>
-      <p className="mt-1.5 truncate text-[12.5px] text-ink-dim">
+    <div className="flex min-w-0 flex-1 items-baseline gap-2">
+      <span className="text-[20px] leading-none text-ink">{code ?? "???"}</span>
+      <span className="truncate text-[12.5px] text-ink-dim">
         {city ?? "Unknown"}
-      </p>
+      </span>
     </div>
   );
 }

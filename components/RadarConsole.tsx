@@ -7,9 +7,9 @@ import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact, Station } from "@/lib/types";
 import { AirportPanel } from "./AirportPanel";
 import { StationControls } from "./StationControls";
-import { FlightBoard } from "./FlightBoard";
+import { FlightBoard, type BoardSlot } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
-import { RadarScope } from "./RadarScope";
+import { LearningCentre } from "./LearningCentre";
 import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -136,9 +136,9 @@ export function RadarConsole() {
 
   /**
    * Every YOW flight in the snapshot, advanced by dead reckoning. Distance and
-   * bearing are from the house: the flight board and the overhead check work
-   * from these. `overhead` is fixed here because the scopes centre on the
-   * airport and can no longer derive it.
+   * bearing are from the house: the boards and the overhead check work from
+   * these. `overhead` is fixed here because the airport scope centres on the
+   * airport and cannot derive it.
    */
   const reckoned: Contact[] = useMemo(() => {
     if (!data) return [];
@@ -168,8 +168,9 @@ export function RadarConsole() {
   }, [data, nowTs, home.lat, home.lon, overheadRadius]);
 
   /**
-   * The same contacts placed around the airport, for the radar and the list.
-   * `overhead` (house-relative) rides along from `reckoned`.
+   * The same contacts placed around the airport and cut to the chosen range,
+   * nearest the airport first, for the traffic list and picking each board's
+   * lead. `overhead` (house-relative) rides along from `reckoned`.
    */
   const live: Contact[] = useMemo(
     () =>
@@ -194,42 +195,28 @@ export function RadarConsole() {
     [reckoned, effectiveRange],
   );
 
-  /** The house, as distance and bearing from the airport at the scope centre. */
-  const homeOnRadar = useMemo(
-    () => ({
-      distanceKm: haversineKm(
-        HOME_AIRPORT.lat,
-        HOME_AIRPORT.lon,
-        home.lat,
-        home.lon,
-      ),
-      bearingDeg: bearingDeg(
-        HOME_AIRPORT.lat,
-        HOME_AIRPORT.lon,
-        home.lat,
-        home.lon,
-      ),
-    }),
-    [home.lat, home.lon],
-  );
-
-  // The board headline: your pick, else the most interesting flight. Always
-  // from `reckoned` so its distance reads from the house.
-  const pinned = selectedId != null;
-  const autoFocus = useMemo(() => {
-    if (reckoned.length === 0) return null;
-    const overheadNow = reckoned.find((c) => c.overhead);
-    if (overheadNow) return overheadNow;
-    const meaningful = reckoned.find(
-      (c) => c.phase === "arriving" || c.phase === "departing",
-    );
-    return meaningful ?? reckoned[0];
-  }, [reckoned]);
-
-  const boardContact = pinned
+  // --- the two boards --------------------------------------------------------
+  const selected = selectedId
     ? (reckoned.find((c) => c.id === selectedId) ?? null)
-    : autoFocus;
-  const boardOverhead = boardContact?.overhead ?? false;
+    : null;
+
+  /**
+   * The flight leading one side of the board. A flight you picked from the
+   * list or the airport scope wins its own side; otherwise anything overhead,
+   * then whichever is closest to the airport: the next to land, or the one
+   * that just took off. Shown with its house-relative numbers from `reckoned`.
+   */
+  const lead = (slot: BoardSlot) => {
+    if (selected?.phase === slot) return { contact: selected, pinned: true };
+    const inSlot = live.filter((c) => c.phase === slot);
+    const top = inSlot.find((c) => c.overhead) ?? inSlot[0];
+    return {
+      contact: top ? (reckoned.find((c) => c.id === top.id) ?? null) : null,
+      pinned: false,
+    };
+  };
+  const arriving = lead("arriving");
+  const departing = lead("departing");
 
   // --- actions --------------------------------------------------------------
   const applyStation = useCallback(async (query: string) => {
@@ -268,6 +255,8 @@ export function RadarConsole() {
   const toggleSelect = useCallback((id: string) => {
     setSelectedId((cur) => (cur === id ? null : id));
   }, []);
+
+  const clearSelection = useCallback(() => setSelectedId(null), []);
 
   const loading = !data && !fetchError;
   const code = HOME_AIRPORT.iata;
@@ -319,67 +308,69 @@ export function RadarConsole() {
           INITIALISING
         </div>
       ) : (
-        <>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
-            {/* min-w-0: grid items default to min-width:auto and would
-                otherwise refuse to shrink below their longest text. */}
-            <div className="flex min-w-0 flex-col gap-4">
-              <FlightBoard
-                contact={boardContact}
-                overhead={boardOverhead}
-                pinned={pinned}
-                onClear={() => setSelectedId(null)}
-                emptyTitle="SIT TIGHT"
-                emptyText={`Open a beer and keep an eye out — there are always more flights coming and going at ${HOME_AIRPORT.name} (${code}). 50 km covers the whole approach.`}
-              />
-              <AirportPanel
-                contacts={reckoned}
-                station={home}
-                selectedId={selectedId}
-                onSelect={toggleSelect}
-                nowTs={nowTs || Date.now()}
-              />
-            </div>
-
-            <div className="flex min-w-0 flex-col gap-4">
-              <StationControls
-                /* Remount when the applied station changes so the field
-                   shows the value that is actually in effect. */
-                key={station?.query ?? "unset"}
-                query={station?.query ?? ""}
-                stationLabel={station?.label ?? null}
-                rangeKm={rangeKm}
-                onSetStation={applyStation}
-                onSetRange={applyRange}
-                resolving={resolving}
-                error={geoError}
-                nowTs={nowTs}
-              />
-              <section className="panel flex justify-center p-4">
-                {/* Cap the square so it does not balloon to full width on a
-                    single-column (tablet / narrow) layout. */}
-                <div className="w-full max-w-[400px]">
-                  <RadarScope
-                    contacts={live}
-                    rangeKm={effectiveRange}
-                    overheadRadiusKm={overheadRadius}
-                    home={homeOnRadar}
-                    loading={loading}
-                    selectedId={selectedId}
-                    onSelect={toggleSelect}
-                  />
-                </div>
-              </section>
-              <InRangeList
-                contacts={live}
-                selectedId={selectedId}
-                onSelect={toggleSelect}
-                title={`${code} TRAFFIC`}
-                emptyText={`No ${code} arrivals or departures within ${Math.round(effectiveRange)} km.`}
-              />
-            </div>
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
+          {/* Main: what is landing and what is taking off. min-w-0: grid
+              items default to min-width:auto and would otherwise refuse to
+              shrink below their longest text. */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <FlightBoard
+              slot="arriving"
+              contact={arriving.contact}
+              overhead={arriving.contact?.overhead ?? false}
+              pinned={arriving.pinned}
+              onClear={clearSelection}
+              emptyText={
+                loading
+                  ? `Scanning the sky around ${code}…`
+                  : `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
+              }
+            />
+            <FlightBoard
+              slot="departing"
+              contact={departing.contact}
+              overhead={departing.contact?.overhead ?? false}
+              pinned={departing.pinned}
+              onClear={clearSelection}
+              emptyText={
+                loading
+                  ? `Scanning the sky around ${code}…`
+                  : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
+              }
+            />
+            <InRangeList
+              contacts={live}
+              selectedId={selectedId}
+              onSelect={toggleSelect}
+              title={`${code} TRAFFIC`}
+              emptyText={`No ${code} arrivals or departures within ${Math.round(effectiveRange)} km.`}
+            />
+            <StationControls
+              /* Remount when the applied station changes so the field
+                 shows the value that is actually in effect. */
+              key={station?.query ?? "unset"}
+              query={station?.query ?? ""}
+              stationLabel={station?.label ?? null}
+              rangeKm={rangeKm}
+              onSetStation={applyStation}
+              onSetRange={applyRange}
+              resolving={resolving}
+              error={geoError}
+              nowTs={nowTs}
+            />
           </div>
-        </>
+
+          {/* Side: the airport at a glance, and the glossary. */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <AirportPanel
+              contacts={reckoned}
+              station={home}
+              selectedId={selectedId}
+              onSelect={toggleSelect}
+              nowTs={nowTs || Date.now()}
+            />
+            <LearningCentre />
+          </div>
+        </div>
       )}
 
       <footer className="mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
