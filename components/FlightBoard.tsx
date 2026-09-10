@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
@@ -77,6 +77,13 @@ function Stat({
   );
 }
 
+/**
+ * Time the board spends fading out the old content before the new content
+ * swaps in. Must match the `.board-swap` transition duration in
+ * globals.css.
+ */
+const BOARD_SWAP_MS = 200;
+
 export function FlightBoard({
   contact,
   overhead,
@@ -92,9 +99,52 @@ export function FlightBoard({
   emptyTitle: string;
   emptyText: string;
 }) {
-  if (!contact) {
+  // What is actually on screen right now. It lags `contact` by one swap
+  // cycle when the flight identity changes, so the old content stays put
+  // for the leave animation instead of vanishing the instant a new flight
+  // takes over the board.
+  const [shown, setShown] = useState(contact);
+  const [shownOverhead, setShownOverhead] = useState(overhead);
+  const [shownPinned, setShownPinned] = useState(pinned);
+  const [phase, setPhase] = useState<"idle" | "leaving" | "entering">("idle");
+  /** The flight id currently on screen — only this identity change animates. */
+  const shownId = useRef<string | null>(contact?.id ?? null);
+
+  useEffect(() => {
+    const nextId = contact?.id ?? null;
+    if (nextId === shownId.current) {
+      // Same flight (or still empty): just refresh the live numbers.
+      setShown(contact);
+      setShownOverhead(overhead);
+      setShownPinned(pinned);
+      return;
+    }
+    // A different flight (or the empty state) is taking over the board:
+    // fade the current content out, then swap and fade the new content in.
+    setPhase("leaving");
+    const timer = setTimeout(() => {
+      shownId.current = nextId;
+      setShown(contact);
+      setShownOverhead(overhead);
+      setShownPinned(pinned);
+      setPhase("entering");
+      // Paint the entering (offset, transparent) state once before flipping
+      // to idle, so the browser has something to transition away from.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setPhase("idle"));
+      });
+    }, BOARD_SWAP_MS);
+    return () => clearTimeout(timer);
+  }, [contact, overhead, pinned]);
+
+  const swapClass =
+    phase === "leaving" ? "board-leave" : phase === "entering" ? "board-enter" : "";
+
+  if (!shown) {
     return (
-      <div className="panel flex min-h-[260px] flex-col items-center justify-center gap-3 p-6">
+      <div
+        className={`panel board-swap ${swapClass} flex min-h-[260px] flex-col items-center justify-center gap-3 p-6`}
+      >
         <AirplaneInFlight
           size={26}
           weight="bold"
@@ -108,15 +158,15 @@ export function FlightBoard({
     );
   }
 
-  const e = contact.enrichment;
-  const cs = decodeCallsign(contact.callsign);
-  const color = PHASE_COLOR[contact.phase];
-  const kt = msToKt(contact.velocityMs);
-  const fpm = msToFpm(contact.verticalRateMs);
-  const vs = contact.verticalRateMs ?? 0;
+  const e = shown.enrichment;
+  const cs = decodeCallsign(shown.callsign);
+  const color = PHASE_COLOR[shown.phase];
+  const kt = msToKt(shown.velocityMs);
+  const fpm = msToFpm(shown.verticalRateMs);
+  const vs = shown.verticalRateMs ?? 0;
   const vsArrow = vs > 0.5 ? "climb" : vs < -0.5 ? "descend" : "level";
-  const squawk = squawkInfo(contact.squawk);
-  const category = categoryLabel(contact.category);
+  const squawk = squawkInfo(shown.squawk);
+  const category = categoryLabel(shown.category);
 
   // The curated designator table wins: adsbdb occasionally maps a prefix to a
   // different carrier that shares it (ROU comes back as a Chilean airline).
@@ -133,11 +183,11 @@ export function FlightBoard({
     .filter(Boolean)
     .join(" · ");
 
-  const banner = PHASE_BANNER[contact.phase];
+  const banner = PHASE_BANNER[shown.phase];
 
   return (
     <div
-      className="panel flex flex-col"
+      className={`panel board-swap ${swapClass} flex flex-col`}
       style={
         banner
           ? {
@@ -159,8 +209,8 @@ export function FlightBoard({
             : { borderLeft: `4px solid ${color}`, color }
         }
       >
-        <span className={overhead ? "pulse-soft" : undefined}>
-          <PhaseIcon phase={contact.phase} size={banner ? 30 : 22} />
+        <span className={shownOverhead ? "pulse-soft" : undefined}>
+          <PhaseIcon phase={shown.phase} size={banner ? 30 : 22} />
         </span>
         <span
           className={`whitespace-nowrap leading-none ${
@@ -169,10 +219,10 @@ export function FlightBoard({
               : "text-[15px] tracking-[0.28em]"
           }`}
         >
-          {PHASE_LABEL[contact.phase]}
+          {PHASE_LABEL[shown.phase]}
         </span>
 
-        {overhead && (
+        {shownOverhead && (
           <span
             className={`whitespace-nowrap px-2 py-0.5 text-[11.5px] tracking-[0.2em] ${
               banner ? "font-semibold" : "border border-alert text-alert"
@@ -197,9 +247,9 @@ export function FlightBoard({
               banner ? "opacity-70" : "text-ink-faint"
             }`}
           >
-            {pinned ? "PINNED" : "AUTO"}
+            {shownPinned ? "PINNED" : "AUTO"}
           </span>
-          {pinned && (
+          {shownPinned && (
             <button
               type="button"
               onClick={onClear}
@@ -228,7 +278,7 @@ export function FlightBoard({
               {typeLine || "Aircraft type unavailable"}
             </p>
             <p className="mt-1 text-[12.5px] text-ink-faint">
-              {[contact.callsign, contact.icao24.toUpperCase(), category]
+              {[shown.callsign, shown.icao24.toUpperCase(), category]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -274,7 +324,7 @@ export function FlightBoard({
 
         {/* Live numbers */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
-          <Stat label="ALTITUDE" value={flightLevel(contact.baroAltitudeM)} />
+          <Stat label="ALTITUDE" value={flightLevel(shown.baroAltitudeM)} />
           <Stat
             label="GROUND SPEED"
             value={kt != null ? `${Math.round(kt)} kt` : "--"}
@@ -292,8 +342,8 @@ export function FlightBoard({
           />
           <Stat
             label="DISTANCE"
-            value={`${contact.distanceKm.toFixed(1)} km ${compass16(contact.bearingDeg)}`}
-            tone={overhead ? "var(--color-alert)" : undefined}
+            value={`${shown.distanceKm.toFixed(1)} km ${compass16(shown.bearingDeg)}`}
+            tone={shownOverhead ? "var(--color-alert)" : undefined}
           />
         </div>
 

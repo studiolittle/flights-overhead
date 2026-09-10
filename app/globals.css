@@ -335,6 +335,17 @@ body::after {
   animation: live-blink 1.6s ease-in-out infinite;
 }
 
+/* Small "online" indicator next to the local clock. */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 5px rgb(46 204 113 / 0.65);
+  animation: live-blink 2.6s ease-in-out infinite;
+}
+
 /* Draws the eye to the phase icon while an aircraft is actually overhead. */
 .pulse-soft {
   animation: pulse-soft 1.4s ease-in-out infinite;
@@ -343,6 +354,27 @@ body::after {
 
 .blip {
   transition: transform 1000ms linear;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Flight board crossfade. The board swaps content (a new flight, or
+ *  the empty state) rather than mounting fresh, so this animates the
+ *  handoff instead of the abrupt cut a key-based remount would give.
+ *  Timing must match BOARD_SWAP_MS in FlightBoard.tsx.
+ * ------------------------------------------------------------------ */
+
+.board-swap {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.board-leave {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.99);
+}
+
+.board-enter {
+  opacity: 0;
+  transform: translateY(6px) scale(0.99);
 }
 
 .blip-body {
@@ -368,10 +400,18 @@ body::after {
   .live-dot,
   .blip-body,
   .pulse-ring,
-  .pulse-soft {
+  .pulse-soft,
+  .status-dot {
     animation: none;
   }
   .blip {
     transition: none;
+  }
+  .board-swap,
+  .board-leave,
+  .board-enter {
+    transition: none;
+    opacity: 1;
+    transform: none;
   }
 }

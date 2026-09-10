@@ -311,6 +311,7 @@ export function RadarConsole() {
             onSetRange={applyRange}
             resolving={resolving}
             error={geoError}
+            nowTs={nowTs}
           />
 
           <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">

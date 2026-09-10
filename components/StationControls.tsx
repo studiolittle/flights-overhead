@@ -13,6 +13,7 @@ export function StationControls({
   onSetRange,
   resolving,
   error,
+  nowTs,
 }: {
   query: string;
   stationLabel: string | null;
@@ -21,6 +22,9 @@ export function StationControls({
   onSetRange: (km: number) => void;
   resolving: boolean;
   error: string | null;
+  /** 0 before mount, so the clock never renders a server guess that would
+      mismatch the client's real local time. */
+  nowTs: number;
 }) {
   const [value, setValue] = useState(query);
 
@@ -88,17 +92,38 @@ export function StationControls({
         </p>
       </div>
 
-      {/* Resolved location / error */}
-      <p className="flex min-h-[18px] items-center gap-1.5 text-[12.5px] lg:ml-auto lg:pt-6">
-        {error ? (
-          <span className="text-depart">{error}</span>
-        ) : stationLabel ? (
-          <>
-            <MapPin size={13} weight="bold" className="text-accent-ink" />
-            <span className="text-ink-dim">{stationLabel}</span>
-          </>
-        ) : null}
-      </p>
+      {/* Local time, date and resolved location / error */}
+      <div className="flex flex-col gap-1.5 lg:ml-auto">
+        <span className="text-[11.5px] tracking-[0.22em] text-ink-dim">
+          LOCAL TIME &amp; LOCATION
+        </span>
+        {nowTs > 0 && (
+          <span className="flex items-center gap-2 text-[12.5px] text-ink-dim">
+            <span className="status-dot" aria-hidden="true" />
+            {new Date(nowTs).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+            <span className="text-ink-faint">
+              {new Date(nowTs).toLocaleDateString([], {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </span>
+        )}
+        <p className="flex min-h-[18px] items-center gap-1.5 text-[12.5px]">
+          {error ? (
+            <span className="text-depart">{error}</span>
+          ) : stationLabel ? (
+            <>
+              <MapPin size={13} weight="bold" className="text-accent-ink" />
+              <span className="text-ink-dim">{stationLabel}</span>
+            </>
+          ) : null}
+        </p>
+      </div>
     </div>
   );
 }
