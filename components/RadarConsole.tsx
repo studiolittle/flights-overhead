@@ -324,8 +324,8 @@ export function RadarConsole() {
                 overhead={boardOverhead}
                 pinned={pinned}
                 onClear={() => setSelectedId(null)}
-                emptyTitle={`NO ${code} TRAFFIC IN RANGE`}
-                emptyText={`Flights landing at or taking off from ${HOME_AIRPORT.name} (${code}) appear here with their type and route. Try 25 km to cover the whole approach.`}
+                emptyTitle="SIT TIGHT"
+                emptyText={`Open a beer and keep an eye out — there are always more flights coming and going at ${HOME_AIRPORT.name} (${code}). Try 25 km to cover the whole approach.`}
               />
               <AirportPanel
                 contacts={reckoned}

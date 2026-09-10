@@ -6,6 +6,7 @@ import {
   AirplaneTakeoff,
   AirplaneInFlight,
   ArrowRight,
+  BeerStein,
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { PHASE_LABEL } from "@/lib/classify";
@@ -145,11 +146,7 @@ export function FlightBoard({
       <div
         className={`panel board-swap ${swapClass} flex min-h-[260px] flex-col items-center justify-center gap-3 p-6`}
       >
-        <AirplaneInFlight
-          size={26}
-          weight="bold"
-          className="text-ink-faint"
-        />
+        <BeerStein size={26} weight="bold" className="text-accent-ink" />
         <p className="text-[15px] tracking-[0.2em] text-ink-dim">{emptyTitle}</p>
         <p className="max-w-[38ch] text-center text-[13.5px] leading-relaxed text-ink-faint">
           {emptyText}

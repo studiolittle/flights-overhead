@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { MapPin } from "@phosphor-icons/react/dist/ssr";
+import { BeerStein, MapPin } from "@phosphor-icons/react/dist/ssr";
 
 const RANGE_PRESETS = [5, 10, 25, 50] as const;
 
@@ -98,7 +98,7 @@ export function StationControls({
           LOCAL TIME &amp; LOCATION
         </span>
         {nowTs > 0 && (
-          <span className="flex items-center gap-2 text-[12.5px] text-ink-dim">
+          <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-dim">
             <span className="status-dot" aria-hidden="true" />
             {new Date(nowTs).toLocaleTimeString([], {
               hour: "2-digit",
@@ -110,6 +110,10 @@ export function StationControls({
                 month: "short",
                 day: "numeric",
               })}
+            </span>
+            <span className="flex items-center gap-1 text-ink-faint">
+              <BeerStein size={13} weight="bold" className="text-accent-ink" />
+              It&apos;s 5 o&apos;clock somewhere
             </span>
           </span>
         )}
