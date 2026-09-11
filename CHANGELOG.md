@@ -2,6 +2,11 @@
 
 What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest first.
 
+## v0.6.1 · September 11, 2026
+
+- The radar always shows 50 km around YOW, the whole approach. The 25/50 km
+  zoom buttons are gone.
+
 ## v0.6.0 · September 11, 2026
 
 ### Every section has a name

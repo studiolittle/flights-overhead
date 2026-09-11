@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
@@ -29,14 +29,13 @@ const MAP_OPACITY = 0.7;
 const ARRIVAL_COLOR = PHASE_COLOR.arriving;
 const DEPART_COLOR = PHASE_COLOR.departing;
 
-/** The radar's zoom levels, km from the airport to the outer ring. */
-const ZOOMS = [25, 50] as const;
-type Zoom = (typeof ZOOMS)[number];
-const KEY_ZOOM = "fo.zoom";
+/** The radar's reach: km from the airport to the outer ring. */
+const RADAR_KM = 50;
 
 /**
  * Runways are drawn the size they would be in a 12 km view, so they stay
- * readable at either zoom. Not to scale: at true size they would be specks.
+ * readable at the radar's 50 km reach. Not to scale: at true size they
+ * would be specks.
  */
 const RUNWAY_VIEW_KM = 12;
 
@@ -74,8 +73,8 @@ function SectionHeader({ title, aside }: { title: string; aside?: string }) {
 }
 
 /**
- * The YOW Radar section: every YOW flight nearby, around the airport, with
- * the zoom and the colour key. Tapping a plane opens it in Fun Facts.
+ * The YOW Radar section: every YOW flight within 50 km of the airport, with
+ * the colour key. Tapping a plane opens it in Fun Facts.
  */
 export function RadarPanel({
   contacts,
@@ -94,24 +93,6 @@ export function RadarPanel({
   landing: RunwayCall;
   takeoff: RunwayCall;
 }) {
-  const [zoomKm, setZoomKm] = useState<Zoom>(50);
-  useEffect(() => {
-    try {
-      const stored = Number(window.localStorage.getItem(KEY_ZOOM));
-      if (stored === 25 || stored === 50) setZoomKm(stored);
-    } catch {
-      // Blocked storage: start at the default zoom.
-    }
-  }, []);
-  const zoom = (km: Zoom) => {
-    setZoomKm(km);
-    try {
-      window.localStorage.setItem(KEY_ZOOM, String(km));
-    } catch {
-      // Blocked storage: the zoom just does not persist.
-    }
-  };
-
   return (
     <section className="panel flex flex-col">
       <SectionHeader
@@ -121,18 +102,15 @@ export function RadarPanel({
 
       <div className="flex flex-col gap-4 p-4 md:p-5">
         <div className="mx-auto w-full max-w-[420px]">
-          <div className="relative">
-            <AirportScope
-              contacts={contacts}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              landing={landing.ident}
-              takeoff={takeoff.ident}
-              wind={wind}
-              zoomKm={zoomKm}
-            />
-            <ZoomControl value={zoomKm} onChange={zoom} />
-          </div>
+          <AirportScope
+            contacts={contacts}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            landing={landing.ident}
+            takeoff={takeoff.ident}
+            wind={wind}
+            zoomKm={RADAR_KM}
+          />
         </div>
         <Legend />
       </div>
@@ -285,38 +263,6 @@ function RunwayValue({
   );
 }
 
-/** 25 or 50 km, in the scope's top-right corner, outside the rings. */
-function ZoomControl({
-  value,
-  onChange,
-}: {
-  value: Zoom;
-  onChange: (km: Zoom) => void;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label="Radar zoom"
-      className="absolute right-0 top-0 flex items-center gap-1"
-    >
-      {ZOOMS.map((km) => (
-        <button
-          key={km}
-          type="button"
-          onClick={() => onChange(km)}
-          aria-pressed={value === km}
-          className={`chip ${value === km ? "chip-on" : ""}`}
-        >
-          {km}
-        </button>
-      ))}
-      <span className="ml-0.5 text-[11px] tracking-[0.14em] text-ink-faint">
-        KM
-      </span>
-    </div>
-  );
-}
-
 /** Local time and date, for the list under the radar. */
 function LocalTime({ nowTs }: { nowTs: number }) {
   const now = new Date(nowTs);
@@ -358,7 +304,7 @@ function Legend() {
 
 /**
  * The airport from above: the runways (enlarged, see RUNWAY_VIEW_KM), the
- * wind, and every YOW flight within the zoom as a radar blip.
+ * wind, and every YOW flight within `zoomKm` as a radar blip.
  */
 function AirportScope({
   contacts,

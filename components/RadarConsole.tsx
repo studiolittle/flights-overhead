@@ -31,8 +31,8 @@ const POLL_MS = Math.max(
 const MAX_DR_SECONDS = 20;
 
 /**
- * Flights are always fetched for 50 km around YOW, the whole approach. The
- * radar's zoom only changes what it shows.
+ * Flights are fetched for 50 km around YOW, the whole approach: the same
+ * reach the radar shows.
  */
 const RANGE_KM = 50;
 
