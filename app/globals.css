@@ -317,9 +317,10 @@ body::after {
     rgb(var(--c-sweep) / 0.42) 359deg,
     transparent 360deg
   );
-  /* Held back so the aircraft, not the sweep, are the brightest thing. */
-  opacity: 0.55;
-  animation: radar-spin 4.5s linear infinite;
+  /* Barely there: a hint that the radar is searching. The aircraft, not the
+     sweep, stay the brightest thing on the scope. */
+  opacity: 0.3;
+  animation: radar-spin 6s linear infinite;
 }
 
 /* Crisp leading edge of the sweep. Rotates with its parent. */
@@ -409,9 +410,9 @@ body::after {
   body {
     transition: none;
   }
+  /* A frozen beam says nothing, so drop it. */
   .radar-sweep {
-    animation: none;
-    opacity: 0.12;
+    display: none;
   }
   .live-dot,
   .blip-body,

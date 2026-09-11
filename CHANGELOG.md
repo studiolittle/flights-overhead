@@ -2,6 +2,12 @@
 
 What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest first.
 
+## v0.6.2 · September 11, 2026
+
+- A faint gold beam now sweeps slowly around the radar, so you can tell it's
+  searching. It stays behind the planes, so they're still easy to tap, and
+  it's switched off if your device is set to reduce motion.
+
 ## v0.6.1 · September 11, 2026
 
 - The radar always shows 50 km around YOW, the whole approach. The 25/50 km

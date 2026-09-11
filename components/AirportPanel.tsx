@@ -344,9 +344,18 @@ function AirportScope({
 
   return (
     <div className="relative aspect-square w-full">
+      {/* The sweep: a slow, faint beam going round so the radar reads as
+          searching. Fitted inside the outer ring, and behind the aircraft
+          (the svg is positioned and comes later), so blips stay on top and
+          tappable. */}
+      <div
+        className="radar-sweep"
+        style={{ inset: `${((C - R_MAX) / SIZE) * 100}%` }}
+        aria-hidden="true"
+      />
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="block h-full w-full"
+        className="relative block h-full w-full"
         role="img"
         aria-label={`${ap.iata} airport, ${inView.length} aircraft within ${zoomKm} km${landing ? `, landing runway ${landing}` : ""}${takeoff ? `, departing runway ${takeoff}` : ""}`}
       >
