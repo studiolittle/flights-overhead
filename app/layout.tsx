@@ -1,6 +1,17 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
+
+/**
+ * Google Analytics 4 measurement ID. Public by design: every visitor's
+ * browser sees it. NEXT_PUBLIC_GA_ID overrides it. Loads only in production
+ * builds, so local development never shows up as visitors.
+ */
+const GA_ID =
+  process.env.NODE_ENV === "production"
+    ? process.env.NEXT_PUBLIC_GA_ID || "G-KKW2HEXNQT"
+    : null;
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -36,6 +47,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         {children}
       </body>
+      {GA_ID && <GoogleAnalytics gaId={GA_ID} />}
     </html>
   );
 }
