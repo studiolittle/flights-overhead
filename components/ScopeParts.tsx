@@ -160,6 +160,7 @@ export function Blip({
   color,
   selected,
   pulse,
+  fresh = false,
   onSelect,
 }: {
   contact: Contact;
@@ -170,6 +171,8 @@ export function Blip({
   color: string;
   selected: boolean;
   pulse: boolean;
+  /** Just picked up by the radar sweep: plays the detection ping. */
+  fresh?: boolean;
   onSelect: (icao24: string) => void;
 }) {
   const track = c.trackDeg ?? 0;
@@ -204,6 +207,18 @@ export function Blip({
           fill="none"
           stroke="var(--color-alert)"
           strokeWidth={2.5}
+        />
+      )}
+      {/* Just picked up by the sweep: one ring ripples out, then it's gone. */}
+      {fresh && (
+        <circle
+          className="detect-ping"
+          cx={0}
+          cy={0}
+          r={26}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
         />
       )}
       {selected && (

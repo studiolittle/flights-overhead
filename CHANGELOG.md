@@ -2,6 +2,18 @@
 
 What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest first.
 
+## v0.7.0 · September 11, 2026
+
+### A radar that detects
+
+- New aircraft now appear the way they would on a real radar: only when the
+  sweep passes over them, with a ring that ripples out once to show a new
+  detection.
+- Planes already on the radar when you open the page show straight away,
+  and a plane that briefly drops out of the data stays on screen.
+- With reduced motion switched on, there's no sweep, so new planes simply
+  appear.
+
 ## v0.6.2 · September 11, 2026
 
 - A faint gold beam now sweeps slowly around the radar, so you can tell it's

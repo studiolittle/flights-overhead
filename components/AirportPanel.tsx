@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
@@ -38,6 +38,98 @@ const RADAR_KM = 50;
  * would be specks.
  */
 const RUNWAY_VIEW_KM = 12;
+
+/** One turn of the radar sweep, ms. The beam's CSS duration is set from it. */
+const SWEEP_MS = 6000;
+
+/**
+ * An aircraft missing from the feed for longer than this is forgotten, and
+ * waits for the sweep again when it comes back. Shorter gaps are just the
+ * feed dropping a poll, and the plane stays on.
+ */
+const FORGET_MS = 120_000;
+
+/** How long a newly detected aircraft shows its detection ping, ms. */
+const PING_MS = 1500;
+
+/**
+ * The next moment at or after `from` that the sweep's leading edge points at
+ * `bearing`. The beam turns on a shared clock (Date.now() modulo SWEEP_MS,
+ * north at the top of each turn), so this is exact.
+ */
+function nextPass(from: number, bearing: number): number {
+  const turnStart = from - (from % SWEEP_MS);
+  let t = turnStart + (bearing / 360) * SWEEP_MS;
+  if (t < from) t += SWEEP_MS;
+  return t;
+}
+
+/**
+ * Radar-style detection. Aircraft already on the scope when the page loads
+ * show straight away; one that turns up later stays hidden until the sweep's
+ * leading edge passes its bearing, then appears with a detection ping.
+ */
+function useSweepReveal(
+  items: { id: string; bearing: number }[],
+  ready: boolean,
+) {
+  const known = useRef(
+    new Map<string, { revealAt: number; fresh: boolean; lastSeen: number }>(),
+  );
+  const primed = useRef(false);
+  const [reduce] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  // Starts the CSS beam part-way through its turn, so it sits on the same
+  // clock as nextPass().
+  const [delayMs] = useState(() => -(Date.now() % SWEEP_MS));
+  const [, rerender] = useState(0);
+
+  const now = Date.now();
+  for (const { id, bearing } of items) {
+    let k = known.current.get(id);
+    if (!k) {
+      // The first snapshot is "already detected". With reduced motion there
+      // is no beam to wait for.
+      const instant = !primed.current || reduce;
+      k = {
+        revealAt: instant ? 0 : nextPass(now, bearing),
+        fresh: !instant,
+        lastSeen: now,
+      };
+      known.current.set(id, k);
+    }
+    k.lastSeen = now;
+  }
+  if (ready) primed.current = true;
+  for (const [id, k] of known.current) {
+    if (now - k.lastSeen > FORGET_MS) known.current.delete(id);
+  }
+
+  // Wake up exactly when the beam reaches the next hidden aircraft.
+  useEffect(() => {
+    const t = Date.now();
+    let next = Infinity;
+    for (const { id } of items) {
+      const k = known.current.get(id);
+      if (k && k.revealAt > t) next = Math.min(next, k.revealAt);
+    }
+    if (next === Infinity) return;
+    const timer = setTimeout(() => rerender((n) => n + 1), next - t + 20);
+    return () => clearTimeout(timer);
+  });
+
+  return {
+    delayMs,
+    isRevealed: (id: string) => (known.current.get(id)?.revealAt ?? 0) <= now,
+    isFresh: (id: string) => {
+      const k = known.current.get(id);
+      return !!k?.fresh && now - k.revealAt < PING_MS;
+    },
+  };
+}
 
 function windHeadline(w: Wind): string {
   if (w.speedKt === 0) return "Calm";
@@ -78,6 +170,7 @@ function SectionHeader({ title, aside }: { title: string; aside?: string }) {
  */
 export function RadarPanel({
   contacts,
+  ready,
   selectedId,
   onSelect,
   wind,
@@ -86,6 +179,8 @@ export function RadarPanel({
 }: {
   /** Every YOW flight in the feed; the scope keeps the ones in its view. */
   contacts: Contact[];
+  /** The first snapshot has arrived: what it holds counts as already detected. */
+  ready: boolean;
   /** The flight tapped on the radar, drawn highlighted. */
   selectedId: string | null;
   onSelect: (icao24: string) => void;
@@ -110,6 +205,7 @@ export function RadarPanel({
             takeoff={takeoff.ident}
             wind={wind}
             zoomKm={RADAR_KM}
+            ready={ready}
           />
         </div>
         <Legend />
@@ -314,6 +410,7 @@ function AirportScope({
   takeoff,
   wind,
   zoomKm,
+  ready,
 }: {
   contacts: Contact[];
   selectedId: string | null;
@@ -322,6 +419,7 @@ function AirportScope({
   takeoff: string | null;
   wind: Wind | null;
   zoomKm: number;
+  ready: boolean;
 }) {
   const ap = HOME_AIRPORT;
   const scale = R_MAX / zoomKm;
@@ -336,8 +434,18 @@ function AirportScope({
     );
 
   const inView = contacts
-    .map((c) => ({ c, d: haversineKm(ap.lat, ap.lon, c.lat, c.lon) }))
+    .map((c) => ({
+      c,
+      d: haversineKm(ap.lat, ap.lon, c.lat, c.lon),
+      b: bearingDeg(ap.lat, ap.lon, c.lat, c.lon),
+    }))
     .filter((x) => x.d <= zoomKm);
+  // New aircraft wait for the beam; the ones already detected stay on.
+  const sweep = useSweepReveal(
+    inView.map((x) => ({ id: x.c.id, bearing: x.b })),
+    ready,
+  );
+  const shown = inView.filter((x) => sweep.isRevealed(x.c.id));
 
   const windArrow =
     wind && wind.dirDeg != null && wind.speedKt > 0 ? wind.dirDeg : null;
@@ -350,14 +458,18 @@ function AirportScope({
           tappable. */}
       <div
         className="radar-sweep"
-        style={{ inset: `${((C - R_MAX) / SIZE) * 100}%` }}
+        style={{
+          inset: `${((C - R_MAX) / SIZE) * 100}%`,
+          animationDuration: `${SWEEP_MS}ms`,
+          animationDelay: `${sweep.delayMs}ms`,
+        }}
         aria-hidden="true"
       />
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="relative block h-full w-full"
         role="img"
-        aria-label={`${ap.iata} airport, ${inView.length} aircraft within ${zoomKm} km${landing ? `, landing runway ${landing}` : ""}${takeoff ? `, departing runway ${takeoff}` : ""}`}
+        aria-label={`${ap.iata} airport, ${shown.length} aircraft within ${zoomKm} km${landing ? `, landing runway ${landing}` : ""}${takeoff ? `, departing runway ${takeoff}` : ""}`}
       >
         <ScopeFrame rangeKm={zoomKm} crosshair={false} />
 
@@ -404,8 +516,8 @@ function AirportScope({
           )}
         </g>
 
-        {inView.map(({ c, d }) => {
-          const p = polar(C, C, d * scale, bearingDeg(ap.lat, ap.lon, c.lat, c.lon));
+        {shown.map(({ c, d, b }) => {
+          const p = polar(C, C, d * scale, b);
           const overhead = c.overhead === true;
           return (
             <Blip
@@ -417,6 +529,7 @@ function AirportScope({
               color={overhead ? "var(--color-alert)" : PHASE_COLOR[c.phase]}
               selected={c.id === selectedId}
               pulse={overhead}
+              fresh={sweep.isFresh(c.id)}
               onSelect={onSelect}
             />
           );

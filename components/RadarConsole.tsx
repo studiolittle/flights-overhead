@@ -290,6 +290,7 @@ export function RadarConsole() {
             <div className="order-1 min-w-0 lg:order-none">
               <RadarPanel
                 contacts={reckoned}
+                ready={data != null}
                 selectedId={selectedId}
                 onSelect={toggleSelect}
                 wind={airport.wind}

@@ -318,7 +318,9 @@ body::after {
     transparent 360deg
   );
   /* Barely there: a hint that the radar is searching. The aircraft, not the
-     sweep, stay the brightest thing on the scope. */
+     sweep, stay the brightest thing on the scope. The airport scope sets the
+     duration and delay inline (SWEEP_MS) so the beam and aircraft detection
+     run on one clock. */
   opacity: 0.3;
   animation: radar-spin 6s linear infinite;
 }
@@ -406,12 +408,32 @@ body::after {
   animation: rotor-spin 700ms linear infinite;
 }
 
+/* A new aircraft picked up by the sweep: one ring ripples out and fades. */
+@keyframes detect-ping {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+
+.detect-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: detect-ping 1200ms ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body {
     transition: none;
   }
-  /* A frozen beam says nothing, so drop it. */
-  .radar-sweep {
+  /* A frozen beam says nothing, so drop it (new aircraft then appear at
+     once, without a ping). */
+  .radar-sweep,
+  .detect-ping {
     display: none;
   }
   .live-dot,
