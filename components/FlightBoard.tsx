@@ -67,32 +67,37 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
 const BOARD_SWAP_MS = 200;
 
 /**
- * One side of the board: the flight currently leading arrivals or departures.
- * Compact, for the side column. Fun facts lead; the live numbers stay, but as
- * one quiet line.
+ * A flight card, in two versions:
+ *
+ * - "board": Now Arriving / Now Departing. Small and fixed on the flight
+ *   nearest the airport: who it is, the route and one line of live numbers.
+ *   No photo, no fun facts: those live under the radar.
+ * - "picked": the full card for a flight you tapped on the radar, fun
+ *   facts included.
  */
 export function FlightBoard({
   slot,
   contact,
   overhead,
-  pinned,
-  onClear,
   emptyText,
+  variant = "board",
+  onClear,
 }: {
   slot: BoardSlot;
   contact: Contact | null;
   overhead: boolean;
-  pinned: boolean;
-  onClear: () => void;
   emptyText: string;
+  variant?: "board" | "picked";
+  /** picked: close the card. */
+  onClear?: () => void;
 }) {
+
   // What is actually on screen right now. It lags `contact` by one swap
   // cycle when the flight identity changes, so the old content stays put
   // for the leave animation instead of vanishing the instant a new flight
   // takes over the board.
   const [shown, setShown] = useState(contact);
   const [shownOverhead, setShownOverhead] = useState(overhead);
-  const [shownPinned, setShownPinned] = useState(pinned);
   const [swap, setSwap] = useState<"idle" | "leaving" | "entering">("idle");
   /** The flight id currently on screen — only this identity change animates. */
   const shownId = useRef<string | null>(contact?.id ?? null);
@@ -103,7 +108,6 @@ export function FlightBoard({
       // Same flight (or still empty): just refresh the live numbers.
       setShown(contact);
       setShownOverhead(overhead);
-      setShownPinned(pinned);
       return;
     }
     // A different flight (or the empty state) is taking over the board:
@@ -113,7 +117,6 @@ export function FlightBoard({
       shownId.current = nextId;
       setShown(contact);
       setShownOverhead(overhead);
-      setShownPinned(pinned);
       setSwap("entering");
       // Paint the entering (offset, transparent) state once before flipping
       // to idle, so the browser has something to transition away from.
@@ -122,11 +125,12 @@ export function FlightBoard({
       });
     }, BOARD_SWAP_MS);
     return () => clearTimeout(timer);
-  }, [contact, overhead, pinned]);
+  }, [contact, overhead]);
 
   const swapClass =
     swap === "leaving" ? "board-leave" : swap === "entering" ? "board-enter" : "";
   const style = SLOT_STYLE[slot];
+  const picked = variant === "picked";
 
   if (!shown) {
     return (
@@ -140,9 +144,9 @@ export function FlightBoard({
             {PHASE_LABEL[slot]}
           </span>
         </div>
-        <div className="flex items-center gap-3 px-4 py-5">
-          <BeerStein size={22} weight="bold" className="shrink-0 text-accent-ink" />
-          <p className="text-[13.5px] leading-relaxed text-ink-faint">
+        <div className="flex items-center gap-3 px-4 py-4">
+          <BeerStein size={20} weight="bold" className="shrink-0 text-accent-ink" />
+          <p className="text-[13px] leading-relaxed text-ink-faint">
             {emptyText}
           </p>
         </div>
@@ -181,74 +185,98 @@ export function FlightBoard({
 
   return (
     <div
-      className={`panel board-swap ${swapClass} flex flex-col`}
-      style={{
-        borderColor: style.bg,
-        background: `color-mix(in srgb, ${style.bg} 7%, var(--color-surface))`,
-      }}
+      className={`${picked ? "" : "panel "}board-swap ${swapClass} flex flex-col`}
+      // The picked card sits inside the Fun Facts section: no panel of its
+      // own and no arriving/departing colours, so it never reads as another
+      // Now Arriving / Now Departing board.
+      style={
+        picked
+          ? undefined
+          : {
+              borderColor: style.bg,
+              background: `color-mix(in srgb, ${style.bg} 7%, var(--color-surface))`,
+            }
+      }
     >
-      <div
-        className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5"
-        style={{ background: style.bg, color: style.fg }}
-      >
-        <span className={shownOverhead ? "pulse-soft" : undefined}>
-          <SlotIcon slot={slot} size={20} />
-        </span>
-        <span className="whitespace-nowrap text-[15px] font-semibold leading-none tracking-[0.2em]">
-          {PHASE_LABEL[slot]}
-        </span>
+      {!picked && (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5"
+          style={{ background: style.bg, color: style.fg }}
+        >
+          <span className={shownOverhead ? "pulse-soft" : undefined}>
+            <SlotIcon slot={slot} size={18} />
+          </span>
+          <span className="whitespace-nowrap text-[14px] font-semibold leading-none tracking-[0.2em]">
+            {PHASE_LABEL[slot]}
+          </span>
 
-        {shownOverhead && (
-          <span
-            className="whitespace-nowrap px-2 py-0.5 text-[11.5px] font-semibold tracking-[0.2em]"
-            // Inverted on the banner: red on gold is too low-contrast.
-            style={{ background: style.fg, color: style.bg }}
-          >
-            OVERHEAD NOW
-          </span>
-        )}
-        {squawk?.emergency && (
-          <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11.5px] tracking-[0.2em] text-canvas">
-            {squawk.label.toUpperCase()}
-          </span>
-        )}
-
-        <span className="ml-auto flex items-center gap-3">
-          <span className="text-[11.5px] tracking-[0.2em] opacity-70">
-            {shownPinned ? "SELECTED" : "AUTO"}
-          </span>
-          {shownPinned && (
-            <button
-              type="button"
-              onClick={onClear}
-              className="chip flex items-center gap-1.5"
-              style={{ borderColor: style.fg, color: style.fg }}
+          {shownOverhead && (
+            <span
+              className="whitespace-nowrap px-2 py-0.5 text-[11px] font-semibold tracking-[0.2em]"
+              // Inverted on the banner: red on gold is too low-contrast.
+              style={{ background: style.fg, color: style.bg }}
             >
-              <X size={11} weight="bold" />
-              CLEAR
-            </button>
+              OVERHEAD NOW
+            </span>
           )}
-        </span>
-      </div>
+          {squawk?.emergency && (
+            <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-canvas">
+              {squawk.label.toUpperCase()}
+            </span>
+          )}
+        </div>
+      )}
 
-      <div className="flex flex-col gap-3.5 p-4">
+      <div className={`flex flex-col ${picked ? "gap-3.5 px-5 py-4" : "gap-2.5 px-4 py-3"}`}>
         {/* Identity */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-[20px] leading-[1.15] text-pretty break-words text-ink">
+            <h2
+              className={`${picked ? "text-[20px]" : "text-[17px]"} leading-[1.15] text-pretty break-words text-ink`}
+            >
               {title}
             </h2>
             <p className="mt-1 text-[12.5px] text-ink-dim">
               {typeLine || "Aircraft type unavailable"}
             </p>
           </div>
-          {e?.photoThumbUrl && (
-            <AircraftPhoto
-              src={e.photoThumbUrl}
-              alt={`${typeLine || "Aircraft"} in flight`}
-            />
+          {picked && (
+            <div className="flex shrink-0 items-start gap-2.5">
+              {e?.photoThumbUrl && (
+                <AircraftPhoto
+                  src={e.photoThumbUrl}
+                  alt={`${typeLine || "Aircraft"} in flight`}
+                />
+              )}
+              {onClear && (
+                <button
+                  type="button"
+                  onClick={onClear}
+                  aria-label="Close this flight"
+                  className="chip flex items-center px-2"
+                >
+                  <X size={13} weight="bold" />
+                </button>
+              )}
+            </div>
           )}
         </div>
+
+        {/* Picked card: what the board banner would have flagged. */}
+        {picked && (shownOverhead || squawk?.emergency) && (
+          <div className="flex flex-wrap gap-2">
+            {shownOverhead && (
+              <span className="pulse-soft whitespace-nowrap border border-alert px-2 py-0.5 text-[11px] font-semibold tracking-[0.2em] text-alert">
+                OVERHEAD NOW
+              </span>
+            )}
+            {squawk?.emergency && (
+              <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-canvas">
+                {squawk.label.toUpperCase()}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Route */}
         {e?.origin || e?.destination ? (
@@ -259,7 +287,7 @@ export function FlightBoard({
                 city={e?.origin?.municipality ?? e?.origin?.name}
               />
               <ArrowRight
-                size={16}
+                size={15}
                 weight="bold"
                 className="shrink-0 text-ink-faint"
               />
@@ -268,7 +296,7 @@ export function FlightBoard({
                 city={e?.destination?.municipality ?? e?.destination?.name}
               />
             </div>
-            {e?.staleRoute && (
+            {picked && e?.staleRoute && (
               <p className="mt-2 text-[12.5px] leading-snug text-ink-faint">
                 The route on file for this flight number ({e.staleRoute}) is
                 out of date, so only the Ottawa end is shown.
@@ -281,14 +309,25 @@ export function FlightBoard({
           </p>
         )}
 
-        {/* Fun facts lead: they are what people come for */}
-        <AircraftFacts icaoType={e?.icaoType} />
+        {picked ? (
+          <>
+            {/* The fun facts: what people tap a plane for. */}
+            <AircraftFacts icaoType={e?.icaoType} />
 
-        {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
-        <p className="border-t border-line pt-2.5 text-[12px] leading-relaxed tracking-[0.04em] text-ink-faint">
-          <span className="mr-2 text-[11px] tracking-[0.18em]">LIVE</span>
-          {numbers}
-        </p>
+            {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
+            <p className="border-t border-line pt-2.5 text-[12px] leading-relaxed tracking-[0.04em] text-ink-faint">
+              <span className="mr-2 text-[11px] tracking-[0.18em]">LIVE</span>
+              {numbers}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-[11.5px] leading-relaxed tracking-[0.04em] text-ink-faint">
+              <span className="mr-2 text-[10.5px] tracking-[0.18em]">LIVE</span>
+              {numbers}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -303,7 +342,7 @@ function Endpoint({
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-baseline gap-2">
-      <span className="text-[17px] leading-none text-ink">{code ?? "???"}</span>
+      <span className="text-[16px] leading-none text-ink">{code ?? "???"}</span>
       <span className="truncate text-[12px] text-ink-dim">
         {city ?? "Unknown"}
       </span>

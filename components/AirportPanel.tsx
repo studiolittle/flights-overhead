@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
-  HandTap,
 } from "@phosphor-icons/react/dist/ssr";
 import { HOME_AIRPORT } from "@/lib/config";
 import { compass16 } from "@/lib/format";
 import { bearingDeg, haversineKm } from "@/lib/geo";
 import type { Contact, RunwayEnd, WeatherResponse, Wind } from "@/lib/types";
-import { FlightBoard } from "./FlightBoard";
 import {
   Blip,
   C,
@@ -61,37 +59,41 @@ function runwayHeading(ident: string): number | null {
   return Number.isFinite(n) ? n * 10 : null;
 }
 
+/** A section title bar, the same on every section of the page. */
+function SectionHeader({ title, aside }: { title: string; aside?: string }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+      <span className="text-[15px] tracking-[0.28em] text-ink">{title}</span>
+      {aside && (
+        <span className="text-[11.5px] tracking-[0.2em] text-ink-faint">
+          {aside}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /**
- * The airport at a glance, first thing on the page: the radar with every
- * YOW flight nearby, a tidy left-aligned list of the runways in use, wind,
- * weather and local time, then the flight you tapped with its fun facts. The
- * weather and the runway calls come from `useAirportConditions`.
+ * The YOW Radar section: every YOW flight nearby, around the airport, with
+ * the zoom and the colour key. Tapping a plane opens it in Fun Facts.
  */
-export function AirportPanel({
+export function RadarPanel({
   contacts,
-  selected,
+  selectedId,
   onSelect,
-  onClear,
-  nowTs,
-  weather,
-  weatherError,
+  wind,
   landing,
   takeoff,
 }: {
   /** Every YOW flight in the feed; the scope keeps the ones in its view. */
   contacts: Contact[];
-  /** The flight tapped on the radar or picked from the traffic list. */
-  selected: Contact | null;
+  /** The flight tapped on the radar, drawn highlighted. */
+  selectedId: string | null;
   onSelect: (icao24: string) => void;
-  onClear: () => void;
-  nowTs: number;
-  weather: WeatherResponse | null;
-  weatherError: string | null;
+  wind: Wind | null;
   landing: RunwayCall;
   takeoff: RunwayCall;
 }) {
-  const wind = weather?.wind ?? null;
-
   const [zoomKm, setZoomKm] = useState<Zoom>(50);
   useEffect(() => {
     try {
@@ -110,18 +112,53 @@ export function AirportPanel({
     }
   };
 
-  // Bring a newly tapped flight's card into view. On a phone it sits just
-  // under the radar; picked from the traffic list, it can be a scroll away.
-  const pickRef = useRef<HTMLDivElement>(null);
-  const selectedId = selected?.id ?? null;
-  useEffect(() => {
-    if (!selectedId) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    pickRef.current?.scrollIntoView({
-      block: "nearest",
-      behavior: reduce ? "auto" : "smooth",
-    });
-  }, [selectedId]);
+  return (
+    <section className="panel flex flex-col">
+      <SectionHeader
+        title={`${HOME_AIRPORT.iata} RADAR`}
+        aside="TAP A PLANE FOR FUN FACTS"
+      />
+
+      <div className="flex flex-col gap-4 p-4 md:p-5">
+        <div className="mx-auto w-full max-w-[420px]">
+          <div className="relative">
+            <AirportScope
+              contacts={contacts}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              landing={landing.ident}
+              takeoff={takeoff.ident}
+              wind={wind}
+              zoomKm={zoomKm}
+            />
+            <ZoomControl value={zoomKm} onChange={zoom} />
+          </div>
+        </div>
+        <Legend />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The Airport Conditions section: the runways in use, wind, weather, local
+ * time and the raw METAR, in one tidy left-aligned list. The weather and the
+ * runway calls come from `useAirportConditions`.
+ */
+export function ConditionsPanel({
+  nowTs,
+  weather,
+  weatherError,
+  landing,
+  takeoff,
+}: {
+  nowTs: number;
+  weather: WeatherResponse | null;
+  weatherError: string | null;
+  landing: RunwayCall;
+  takeoff: RunwayCall;
+}) {
+  const wind = weather?.wind ?? null;
 
   const observed = weather?.observedAt
     ? new Date(weather.observedAt).toLocaleTimeString([], {
@@ -143,35 +180,12 @@ export function AirportPanel({
 
   return (
     <section className="panel flex flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
-        <span className="text-[15px] tracking-[0.28em] text-ink">
-          {HOME_AIRPORT.iata} AIRPORT
-        </span>
-        <span className="text-[11.5px] tracking-[0.2em] text-ink-faint">
-          {observed ? `METAR ${observed}` : "METAR --"}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-5 p-4 md:p-5">
-        <div className="mx-auto w-full max-w-[420px]">
-          <div className="relative">
-            <AirportScope
-              contacts={contacts}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              landing={landing.ident}
-              takeoff={takeoff.ident}
-              wind={wind}
-              zoomKm={zoomKm}
-            />
-            <ZoomControl value={zoomKm} onChange={zoom} />
-          </div>
-        </div>
-
-        {/* Everything the radar can't show, in one tidy list. */}
-        <div className="flex flex-col gap-3">
-          <Legend />
-          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 border-t border-line pt-3 text-[12.5px] leading-snug text-ink-dim">
+      <SectionHeader
+        title="AIRPORT CONDITIONS"
+        aside={observed ? `METAR ${observed}` : "METAR --"}
+      />
+      <div className="px-5 py-4">
+          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 text-[12.5px] leading-snug text-ink-dim">
             <InfoRow label="LANDING">
               <RunwayValue
                 icon={<AirplaneLanding size={13} weight="bold" />}
@@ -223,28 +237,6 @@ export function AirportPanel({
               </InfoRow>
             )}
           </dl>
-        </div>
-
-        {/* The tapped flight, who it is and its fun facts, on phones only:
-            on desktop it takes over its board beside the radar instead. */}
-        {selected ? (
-          <div ref={pickRef} className="scroll-mt-4 lg:hidden">
-            <FlightBoard
-              slot={selected.phase === "departing" ? "departing" : "arriving"}
-              contact={selected}
-              overhead={selected.overhead ?? false}
-              pinned
-              onClear={onClear}
-              emptyText=""
-            />
-          </div>
-        ) : (
-          <p className="flex items-center gap-2.5 border border-dashed border-line-strong px-4 py-3.5 text-[13.5px] leading-snug text-ink-dim">
-            <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />
-            Tap any plane on the radar for its flight and fun facts.
-          </p>
-        )}
-
       </div>
     </section>
   );

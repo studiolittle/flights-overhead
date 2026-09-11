@@ -399,7 +399,7 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
           <FieldRow
             label="RAW METAR"
             example="30014G23KT 15SM"
-            blurb="The raw weather report, in the compressed code pilots read at a glance. The airport panel is this line, decoded."
+            blurb="The raw weather report, in the compressed code pilots read at a glance. The Airport Conditions section is this line, decoded."
             more={
               <>
                 <strong>30014G23KT</strong> is wind from 300° at 14 knots gusting

@@ -2,6 +2,30 @@
 
 What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest first.
 
+## v0.6.0 · September 11, 2026
+
+### Every section has a name
+
+- The page is now clearly labelled sections: **YOW Radar**, **Airport
+  Conditions**, **Now Arriving**, **Now Departing**, **Fun Facts** and the
+  **Learning Centre**.
+- On desktop: the radar, airport conditions and Learning Centre on the left;
+  Now Arriving, Now Departing and Fun Facts on the right.
+- On phones: the radar first, then Fun Facts, Airport Conditions, Now
+  Arriving, Now Departing and the Learning Centre.
+
+### Fun Facts, front and centre
+
+- The new **Fun Facts** section always shows something: the nearest flight's
+  fun facts, or the full story of any plane you tap on the radar, with its
+  photo and route. Close it with ✕ to go back to the nearest flight.
+
+### Simpler arrivals and departures
+
+- **Now Arriving** and **Now Departing** are small, text-only cards that
+  always show the flights nearest the airport, whatever you tap.
+- The YOW Traffic list is gone; tap a plane on the radar instead.
+
 ## v0.5.0 · September 11, 2026
 
 ### Faster updates

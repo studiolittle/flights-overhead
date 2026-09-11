@@ -5,9 +5,9 @@ import { BeerStein, Broadcast } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
-import { AirportPanel } from "./AirportPanel";
+import { ConditionsPanel, RadarPanel } from "./AirportPanel";
 import { FlightBoard, type BoardSlot } from "./FlightBoard";
-import { InRangeList } from "./InRangeList";
+import { FunFactsSpot } from "./FunFactsSpot";
 import { LearningCentre } from "./LearningCentre";
 import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
@@ -145,8 +145,7 @@ export function RadarConsole() {
 
   /**
    * The same contacts placed around the airport and cut to the chosen range,
-   * nearest the airport first, for the traffic list and picking each board's
-   * lead. `overhead` (house-relative) rides along from `reckoned`.
+   * nearest the airport first, for picking each board's lead. `overhead` (house-relative) rides along from `reckoned`.
    */
   const live: Contact[] = useMemo(
     () =>
@@ -209,45 +208,23 @@ export function RadarConsole() {
   const code = HOME_AIRPORT.iata;
 
   /**
-   * One side of the board, in a desktop and a phone version. On desktop the
-   * boards sit beside the radar, so a flight you pick takes over its own
-   * side. On phones the picked flight opens under the radar instead
-   * (AirportPanel), so the board keeps its own lead and hides if that lead is
-   * the picked flight. Either way the flight shows once.
+   * One side of the board: always the flight nearest the airport, whatever
+   * you have tapped. Its fun facts open in place, like an accordion.
    */
-  const boardFor = (slot: BoardSlot, auto: Contact | null) => {
-    const picked = selected?.phase === slot ? selected : null;
-    const desk = picked ?? auto;
-    const emptyText = loading
-      ? `Scanning the sky around ${code}…`
-      : slot === "arriving"
-        ? `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
-        : `Nothing taking off from ${code} right now. Keep an eye on the runway.`;
-    return (
-      <>
-        <div className="hidden lg:block">
-          <FlightBoard
-            slot={slot}
-            contact={desk}
-            overhead={desk?.overhead ?? false}
-            pinned={picked != null}
-            onClear={clearSelection}
-            emptyText={emptyText}
-          />
-        </div>
-        <div className={auto && auto.id === selectedId ? "hidden" : "lg:hidden"}>
-          <FlightBoard
-            slot={slot}
-            contact={auto}
-            overhead={auto?.overhead ?? false}
-            pinned={false}
-            onClear={clearSelection}
-            emptyText={emptyText}
-          />
-        </div>
-      </>
-    );
-  };
+  const boardFor = (slot: BoardSlot, lead: Contact | null) => (
+    <FlightBoard
+      slot={slot}
+      contact={lead}
+      overhead={lead?.overhead ?? false}
+      emptyText={
+        loading
+          ? `Scanning the sky around ${code}…`
+          : slot === "arriving"
+            ? `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
+            : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
+      }
+    />
+  );
 
   return (
     <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
@@ -298,22 +275,30 @@ export function RadarConsole() {
           INITIALISING
         </div>
       ) : (
-        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,400px)] lg:items-start">
-          {/* On desktop the two wrappers below are real columns. Narrower,
-              they are display:contents, so `order` can interleave their
-              children: airport, the two boards, learning, then traffic.
-              min-w-0: grid and flex items default to
-              min-width:auto and would otherwise refuse to shrink below their
-              longest text. */}
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:items-start">
+          {/* Every block is a named section. Desktop, two columns:
+                left:  YOW Radar, Airport Conditions, Learning Centre
+                right: Now Arriving, Now Departing, Fun Facts
+              Phones stack them in the order people use them: YOW Radar,
+              Fun Facts, Airport Conditions, Now Arriving, Now Departing,
+              Learning Centre. The column wrappers are display:contents
+              below desktop, so `order` can interleave their children.
+              min-w-0: grid and flex items default to min-width:auto and
+              would otherwise refuse to shrink below their longest text. */}
 
-          {/* Main: the airport and its runways in use, then learning. */}
           <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
             <div className="order-1 min-w-0 lg:order-none">
-              <AirportPanel
+              <RadarPanel
                 contacts={reckoned}
-                selected={selected}
+                selectedId={selectedId}
                 onSelect={toggleSelect}
-                onClear={clearSelection}
+                wind={airport.wind}
+                landing={airport.landing}
+                takeoff={airport.takeoff}
+              />
+            </div>
+            <div className="order-3 min-w-0 lg:order-none">
+              <ConditionsPanel
                 nowTs={nowTs || Date.now()}
                 weather={airport.weather}
                 weatherError={airport.weatherError}
@@ -321,25 +306,23 @@ export function RadarConsole() {
                 takeoff={airport.takeoff}
               />
             </div>
-            <div className="order-3 min-w-0 lg:order-none">
+            <div className="order-6 min-w-0 lg:order-none">
               <LearningCentre flight={focus} />
             </div>
           </div>
 
-          {/* Side: what is landing and what is taking off, then the full
-              traffic list. */}
           <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-            <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-none">
+            <div className="order-4 min-w-0 lg:order-none">
               {boardFor("arriving", arriving)}
+            </div>
+            <div className="order-5 min-w-0 lg:order-none">
               {boardFor("departing", departing)}
             </div>
-            <div className="order-4 flex min-w-0 flex-col gap-4 lg:order-none">
-              <InRangeList
-                contacts={live}
-                selectedId={selectedId}
-                onSelect={toggleSelect}
-                title={`${code} TRAFFIC`}
-                emptyText={`No ${code} arrivals or departures within ${Math.round(effectiveRange)} km.`}
+            <div className="order-2 min-w-0 lg:order-none">
+              <FunFactsSpot
+                selected={selected}
+                featured={arriving ?? departing}
+                onClear={clearSelection}
               />
             </div>
           </div>
