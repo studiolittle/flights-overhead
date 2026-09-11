@@ -187,6 +187,10 @@ export function RadarConsole() {
    */
   const focus = selected ?? arriving.contact ?? departing.contact;
 
+  /** Hidden below desktop when a board would repeat the tapped flight. */
+  const dupeClass = (c: Contact | null) =>
+    c && c.id === selectedId ? "hidden lg:block" : undefined;
+
   // --- actions --------------------------------------------------------------
   const toggleSelect = useCallback((id: string) => {
     setSelectedId((cur) => (cur === id ? null : id));
@@ -219,7 +223,9 @@ export function RadarConsole() {
         </div>
       </header>
 
-      <div className="panel flex items-start gap-3 px-5 py-4">
+      {/* On phones the welcome drops to the bottom, just above the footer,
+          so the radar is the first thing on screen. */}
+      <div className="panel order-1 flex items-start gap-3 px-5 py-4 lg:order-none">
         <BeerStein
           size={20}
           weight="bold"
@@ -276,30 +282,36 @@ export function RadarConsole() {
               traffic list. */}
           <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
             <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-none">
-              <FlightBoard
-                slot="arriving"
-                contact={arriving.contact}
-                overhead={arriving.contact?.overhead ?? false}
-                pinned={arriving.pinned}
-                onClear={clearSelection}
-                emptyText={
-                  loading
-                    ? `Scanning the sky around ${code}…`
-                    : `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
-                }
-              />
-              <FlightBoard
-                slot="departing"
-                contact={departing.contact}
-                overhead={departing.contact?.overhead ?? false}
-                pinned={departing.pinned}
-                onClear={clearSelection}
-                emptyText={
-                  loading
-                    ? `Scanning the sky around ${code}…`
-                    : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
-                }
-              />
+              {/* A board showing the flight you tapped hides on phones: the
+                  same card is already open right under the radar. */}
+              <div className={dupeClass(arriving.contact)}>
+                <FlightBoard
+                  slot="arriving"
+                  contact={arriving.contact}
+                  overhead={arriving.contact?.overhead ?? false}
+                  pinned={arriving.pinned}
+                  onClear={clearSelection}
+                  emptyText={
+                    loading
+                      ? `Scanning the sky around ${code}…`
+                      : `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
+                  }
+                />
+              </div>
+              <div className={dupeClass(departing.contact)}>
+                <FlightBoard
+                  slot="departing"
+                  contact={departing.contact}
+                  overhead={departing.contact?.overhead ?? false}
+                  pinned={departing.pinned}
+                  onClear={clearSelection}
+                  emptyText={
+                    loading
+                      ? `Scanning the sky around ${code}…`
+                      : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
+                  }
+                />
+              </div>
             </div>
             <div className="order-4 flex min-w-0 flex-col gap-4 lg:order-none">
               <InRangeList
@@ -314,7 +326,7 @@ export function RadarConsole() {
         </div>
       )}
 
-      <footer className="mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
+      <footer className="order-2 mt-auto flex flex-col lg:order-none items-center gap-1.5 border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
         {mounted && (
           <div className="mb-2">
             <StatusBar
