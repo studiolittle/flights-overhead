@@ -215,7 +215,7 @@ export function FlightBoard({
 
         <span className="ml-auto flex items-center gap-3">
           <span className="text-[11.5px] tracking-[0.2em] opacity-70">
-            {shownPinned ? "PINNED" : "AUTO"}
+            {shownPinned ? "SELECTED" : "AUTO"}
           </span>
           {shownPinned && (
             <button

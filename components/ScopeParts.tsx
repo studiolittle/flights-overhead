@@ -174,8 +174,8 @@ export function Blip({
         }
       }}
     >
-      {/* generous invisible hit target */}
-      <circle cx={0} cy={0} r={40} fill="transparent" />
+      {/* generous invisible hit target: about a fingertip on a phone */}
+      <circle cx={0} cy={0} r={60} fill="transparent" />
 
       {pulse && (
         <circle

@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
   BeerStein,
+  HandTap,
   Wind as WindIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { HOME_AIRPORT } from "@/lib/config";
-import { compass16, compassWord } from "@/lib/format";
+import { compass16 } from "@/lib/format";
 import { bearingDeg, haversineKm } from "@/lib/geo";
 import type { Contact, RunwayEnd, WeatherResponse, Wind } from "@/lib/types";
-import { LearnMore } from "./Explainer";
+import { FlightBoard } from "./FlightBoard";
 import {
   Blip,
   C,
@@ -31,9 +32,6 @@ const MAP_OPACITY = 0.7;
 
 const ARRIVAL_COLOR = PHASE_COLOR.arriving;
 const DEPART_COLOR = PHASE_COLOR.departing;
-
-/** knots -> km/h */
-const KT_TO_KMH = 1.852;
 
 /** The radar's zoom levels, km from the airport to the outer ring. */
 const ZOOMS = [25, 50] as const;
@@ -65,27 +63,17 @@ function runwayHeading(ident: string): number | null {
   return Number.isFinite(n) ? n * 10 : null;
 }
 
-/** Why these runways: the wind, in plain language. */
-function whyText(wind: Wind | null): string {
-  if (!wind) return "Waiting for the latest airport weather.";
-  if (wind.speedKt === 0 || wind.dirDeg == null) {
-    return "The wind is light or shifting, so controllers can use either direction.";
-  }
-  const kmh = Math.round(wind.speedKt * KT_TO_KMH);
-  return `Planes land and take off into the wind for extra lift, and right now it's blowing from the ${compassWord(wind.dirDeg)} at ${wind.speedKt} kt (about ${kmh} km/h).`;
-}
-
 /**
- * The airport at a glance, first thing on the page: the radar with the
- * runways in use and every YOW flight nearby, the local time, which way
- * planes are landing and taking off, why the wind decides it, and the latest
- * weather report. The weather and the runway calls come from
- * `useAirportConditions`.
+ * The airport at a glance, first thing on the page: the radar with every
+ * YOW flight nearby, the runways in use in one line, the local time, the
+ * flight you tapped with its fun facts, then the wind and the latest weather
+ * report. The weather and the runway calls come from `useAirportConditions`.
  */
 export function AirportPanel({
   contacts,
-  selectedId,
+  selected,
   onSelect,
+  onClear,
   nowTs,
   weather,
   weatherError,
@@ -94,8 +82,10 @@ export function AirportPanel({
 }: {
   /** Every YOW flight in the feed; the scope keeps the ones in its view. */
   contacts: Contact[];
-  selectedId: string | null;
+  /** The flight tapped on the radar or picked from the traffic list. */
+  selected: Contact | null;
   onSelect: (icao24: string) => void;
+  onClear: () => void;
   nowTs: number;
   weather: WeatherResponse | null;
   weatherError: string | null;
@@ -121,6 +111,19 @@ export function AirportPanel({
       // Blocked storage: the zoom just does not persist.
     }
   };
+
+  // Bring a newly tapped flight's card into view. On a phone it sits just
+  // under the radar; picked from the traffic list, it can be a scroll away.
+  const pickRef = useRef<HTMLDivElement>(null);
+  const selectedId = selected?.id ?? null;
+  useEffect(() => {
+    if (!selectedId) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    pickRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: reduce ? "auto" : "smooth",
+    });
+  }, [selectedId]);
 
   const observed = weather?.observedAt
     ? new Date(weather.observedAt).toLocaleTimeString([], {
@@ -151,8 +154,7 @@ export function AirportPanel({
         </span>
       </div>
 
-      {/* The radar, with the runways in use and the weather under it. */}
-      <div className="flex flex-col gap-5 p-5">
+      <div className="flex flex-col gap-5 p-4 md:p-5">
         <div className="mx-auto w-full max-w-[420px]">
           <div className="relative">
             <AirportScope
@@ -167,74 +169,60 @@ export function AirportPanel({
             <ZoomControl value={zoomKm} onChange={zoom} />
           </div>
           <Legend />
+          <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[12.5px]">
+            <RunwayNote
+              label="LANDING"
+              icon={<AirplaneLanding size={14} weight="bold" />}
+              color={ARRIVAL_COLOR}
+              call={landing}
+              op="arrival"
+            />
+            <RunwayNote
+              label="TAKING OFF"
+              icon={<AirplaneTakeoff size={14} weight="bold" />}
+              color={DEPART_COLOR}
+              call={takeoff}
+              op="departure"
+            />
+          </div>
           <LocalTime nowTs={nowTs} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-5 border-t border-line pt-5">
-          <div>
-            <p className="text-[11.5px] tracking-[0.18em] text-ink-faint">
-              RUNWAYS IN USE
+        {/* The tapped flight: who it is and its fun facts. */}
+        <div ref={pickRef} className="scroll-mt-4">
+          {selected ? (
+            <FlightBoard
+              slot={selected.phase === "departing" ? "departing" : "arriving"}
+              contact={selected}
+              overhead={selected.overhead ?? false}
+              pinned
+              onClear={onClear}
+              emptyText=""
+            />
+          ) : (
+            <p className="flex items-center justify-center gap-2.5 border border-dashed border-line-strong px-4 py-4 text-center text-[13.5px] leading-snug text-ink-dim">
+              <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />
+              Tap any plane on the radar for its flight and fun facts.
             </p>
-            <div className="mt-3 grid grid-cols-2 gap-5">
-              <RunwayCard
-                label="LANDING"
-                icon={
-                  <AirplaneLanding
-                    size={14}
-                    weight="bold"
-                    style={{ color: ARRIVAL_COLOR }}
-                  />
-                }
-                color={ARRIVAL_COLOR}
-                call={landing}
-                op="arrival"
-                hasWind={wind != null}
-                nowTs={nowTs}
-              />
-              <RunwayCard
-                label="TAKING OFF"
-                icon={
-                  <AirplaneTakeoff
-                    size={14}
-                    weight="bold"
-                    style={{ color: DEPART_COLOR }}
-                  />
-                }
-                color={DEPART_COLOR}
-                call={takeoff}
-                op="departure"
-                hasWind={wind != null}
-                nowTs={nowTs}
-              />
-            </div>
-          </div>
+          )}
+        </div>
 
-          <div className="border-t border-line pt-3.5 text-[13px] leading-relaxed text-ink-dim">
-            {whyText(wind)}
-            <LearnMore>
-              Runways are named for the compass direction they point, with the
-              last digit dropped: <strong>Runway 32</strong> points at 320°. The
-              same strip of pavement is Runway 14 from the other end, because
-              140° is the opposite way. Ottawa has three runways, so six numbers
-              in all.
-            </LearnMore>
-          </div>
-
-          <div className="border-t border-line pt-4">
+        <div className="flex min-w-0 flex-col gap-4 border-t border-line pt-4">
+          <div>
             <p className="text-[11.5px] tracking-[0.18em] text-ink-faint">
               WIND
             </p>
             {wind ? (
               <>
-                <p className="mt-2 flex items-center gap-2.5 text-[20px] leading-tight text-ink">
+                <p className="mt-2 flex items-center gap-2.5 text-[18px] leading-tight text-ink">
                   <WindIcon
-                    size={20}
+                    size={18}
                     weight="bold"
                     className="shrink-0 text-accent-ink"
                   />
                   {windHeadline(wind)}
                 </p>
-                <p className="mt-1.5 text-[13.5px] text-ink-dim">
+                <p className="mt-1.5 text-[13px] text-ink-dim">
                   {[
                     wind.dirDeg != null && wind.speedKt > 0
                       ? `From the ${compass16(wind.dirDeg)}`
@@ -248,7 +236,7 @@ export function AirportPanel({
                 </p>
               </>
             ) : (
-              <p className="mt-2 text-[13.5px] text-ink-dim">
+              <p className="mt-2 text-[13px] text-ink-dim">
                 {weatherError
                   ? `Weather unavailable: ${weatherError}`
                   : "Loading the latest METAR"}
@@ -257,7 +245,7 @@ export function AirportPanel({
           </div>
 
           {conditions && (
-            <p className="border-t border-line pt-4 text-[13.5px] text-ink-dim">
+            <p className="border-t border-line pt-4 text-[13px] text-ink-dim">
               {conditions}
             </p>
           )}
@@ -272,59 +260,39 @@ export function AirportPanel({
   );
 }
 
-function RunwayCard({
+/** One runway in use, in a line: "LANDING RWY 32 in from the SE". */
+function RunwayNote({
   label,
   icon,
   color,
   call,
   op,
-  hasWind,
-  nowTs,
 }: {
   label: string;
   icon: ReactNode;
   color: string;
   call: RunwayCall;
   op: "arrival" | "departure";
-  hasWind: boolean;
-  nowTs: number;
 }) {
-  const heading = call.ident ? runwayHeading(call.ident) : null;
-
+  const h = call.ident ? runwayHeading(call.ident) : null;
   // Where to look from the ground: arrivals come in over the opposite end.
-  const direction =
-    heading == null
+  const where =
+    h == null
       ? null
       : op === "arrival"
-        ? `Coming in from the ${compassWord(heading + 180)}, pointed ${compassWord(heading)} (${heading}°).`
-        : `Rolling ${compassWord(heading)} (${heading}°) and climbing out that way.`;
-
-  const detail =
-    call.source === "seen"
-      ? `${call.sighting.callsign} ${op === "arrival" ? "on final" : "climbing out"}, ${minutesAgo(nowTs - call.sighting.at)}`
-      : call.source === "wind"
-        ? `Into the wind: ${Math.round(call.wind.headwindKt)} kt headwind, ${Math.round(call.wind.crosswindKt)} kt crosswind`
-        : hasWind
-          ? "Light wind, so either direction"
-          : "Waiting for the weather";
-
+        ? `in from the ${compass16(h + 180)}`
+        : `out to the ${compass16(h)}`;
   return (
-    <div className="min-w-0">
-      <span className="flex items-center gap-1.5 text-[11.5px] tracking-[0.18em] text-ink-faint">
-        {icon}
+    <span className="flex items-center gap-1.5 whitespace-nowrap">
+      <span style={{ color }}>{icon}</span>
+      <span className="text-[11px] tracking-[0.16em] text-ink-faint">
         {label}
       </span>
-      <p
-        className="mt-2 whitespace-nowrap text-[24px] leading-none"
-        style={{ color: call.ident ? color : "var(--color-ink-faint)" }}
-      >
+      <span style={{ color: call.ident ? color : "var(--color-ink-faint)" }}>
         {call.ident ? `RWY ${call.ident}` : "--"}
-      </p>
-      {direction && (
-        <p className="mt-2.5 text-[14px] leading-snug text-ink">{direction}</p>
-      )}
-      <p className="mt-1.5 text-[12.5px] leading-snug text-ink-dim">{detail}</p>
-    </div>
+      </span>
+      {where && <span className="text-ink-faint">{where}</span>}
+    </span>
   );
 }
 
@@ -364,7 +332,7 @@ function ZoomControl({
 function LocalTime({ nowTs }: { nowTs: number }) {
   const now = new Date(nowTs);
   return (
-    <p className="mt-3 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12.5px] text-ink-dim">
+    <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12.5px] text-ink-dim">
       <span className="status-dot" aria-hidden="true" />
       {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
       <span className="text-ink-faint">

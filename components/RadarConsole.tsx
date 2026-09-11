@@ -165,13 +165,12 @@ export function RadarConsole() {
     : null;
 
   /**
-   * The flight leading one side of the board. A flight you picked from the
-   * list or the airport scope wins its own side; otherwise anything overhead,
-   * then whichever is closest to the airport: the next to land, or the one
-   * that just took off. Shown with its house-relative numbers from `reckoned`.
+   * The flight leading one side of the board: anything overhead, then
+   * whichever is closest to the airport: the next to land, or the one that
+   * just took off. A flight you tap shows under the radar instead, so the
+   * boards never repeat it. Shown with its numbers from `reckoned`.
    */
   const lead = (slot: BoardSlot) => {
-    if (selected?.phase === slot) return { contact: selected, pinned: true };
     const inSlot = live.filter((c) => c.phase === slot);
     const top = inSlot.find((c) => c.overhead) ?? inSlot[0];
     return {
@@ -258,8 +257,9 @@ export function RadarConsole() {
             <div className="order-1 min-w-0 lg:order-none">
               <AirportPanel
                 contacts={reckoned}
-                selectedId={selectedId}
+                selected={selected}
                 onSelect={toggleSelect}
+                onClear={clearSelection}
                 nowTs={nowTs || Date.now()}
                 weather={airport.weather}
                 weatherError={airport.weatherError}
