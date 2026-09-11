@@ -165,18 +165,14 @@ export function RadarConsole() {
     : null;
 
   /**
-   * The flight leading one side of the board: anything overhead, then
-   * whichever is closest to the airport: the next to land, or the one that
-   * just took off. A flight you tap shows under the radar instead, so the
-   * boards never repeat it. Shown with its numbers from `reckoned`.
+   * The flight leading one side of the board on its own: anything overhead,
+   * then whichever is closest to the airport: the next to land, or the one
+   * that just took off. Shown with its numbers from `reckoned`.
    */
-  const lead = (slot: BoardSlot) => {
+  const lead = (slot: BoardSlot): Contact | null => {
     const inSlot = live.filter((c) => c.phase === slot);
     const top = inSlot.find((c) => c.overhead) ?? inSlot[0];
-    return {
-      contact: top ? (reckoned.find((c) => c.id === top.id) ?? null) : null,
-      pinned: false,
-    };
+    return top ? (reckoned.find((c) => c.id === top.id) ?? null) : null;
   };
   const arriving = lead("arriving");
   const departing = lead("departing");
@@ -185,11 +181,7 @@ export function RadarConsole() {
    * The flight the Learning Centre's tags describe: the one you picked, else
    * the next arrival, else the latest departure.
    */
-  const focus = selected ?? arriving.contact ?? departing.contact;
-
-  /** Hidden below desktop when a board would repeat the tapped flight. */
-  const dupeClass = (c: Contact | null) =>
-    c && c.id === selectedId ? "hidden lg:block" : undefined;
+  const focus = selected ?? arriving ?? departing;
 
   // --- actions --------------------------------------------------------------
   const toggleSelect = useCallback((id: string) => {
@@ -200,6 +192,47 @@ export function RadarConsole() {
 
   const loading = !data && !fetchError;
   const code = HOME_AIRPORT.iata;
+
+  /**
+   * One side of the board, in a desktop and a phone version. On desktop the
+   * boards sit beside the radar, so a flight you pick takes over its own
+   * side. On phones the picked flight opens under the radar instead
+   * (AirportPanel), so the board keeps its own lead and hides if that lead is
+   * the picked flight. Either way the flight shows once.
+   */
+  const boardFor = (slot: BoardSlot, auto: Contact | null) => {
+    const picked = selected?.phase === slot ? selected : null;
+    const desk = picked ?? auto;
+    const emptyText = loading
+      ? `Scanning the sky around ${code}…`
+      : slot === "arriving"
+        ? `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
+        : `Nothing taking off from ${code} right now. Keep an eye on the runway.`;
+    return (
+      <>
+        <div className="hidden lg:block">
+          <FlightBoard
+            slot={slot}
+            contact={desk}
+            overhead={desk?.overhead ?? false}
+            pinned={picked != null}
+            onClear={clearSelection}
+            emptyText={emptyText}
+          />
+        </div>
+        <div className={auto && auto.id === selectedId ? "hidden" : "lg:hidden"}>
+          <FlightBoard
+            slot={slot}
+            contact={auto}
+            overhead={auto?.overhead ?? false}
+            pinned={false}
+            onClear={clearSelection}
+            emptyText={emptyText}
+          />
+        </div>
+      </>
+    );
+  };
 
   return (
     <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
@@ -282,36 +315,8 @@ export function RadarConsole() {
               traffic list. */}
           <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
             <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-none">
-              {/* A board showing the flight you tapped hides on phones: the
-                  same card is already open right under the radar. */}
-              <div className={dupeClass(arriving.contact)}>
-                <FlightBoard
-                  slot="arriving"
-                  contact={arriving.contact}
-                  overhead={arriving.contact?.overhead ?? false}
-                  pinned={arriving.pinned}
-                  onClear={clearSelection}
-                  emptyText={
-                    loading
-                      ? `Scanning the sky around ${code}…`
-                      : `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
-                  }
-                />
-              </div>
-              <div className={dupeClass(departing.contact)}>
-                <FlightBoard
-                  slot="departing"
-                  contact={departing.contact}
-                  overhead={departing.contact?.overhead ?? false}
-                  pinned={departing.pinned}
-                  onClear={clearSelection}
-                  emptyText={
-                    loading
-                      ? `Scanning the sky around ${code}…`
-                      : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
-                  }
-                />
-              </div>
+              {boardFor("arriving", arriving)}
+              {boardFor("departing", departing)}
             </div>
             <div className="order-4 flex min-w-0 flex-col gap-4 lg:order-none">
               <InRangeList

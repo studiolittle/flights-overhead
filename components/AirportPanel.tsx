@@ -188,9 +188,10 @@ export function AirportPanel({
           <LocalTime nowTs={nowTs} />
         </div>
 
-        {/* The tapped flight: who it is and its fun facts. */}
-        <div ref={pickRef} className="scroll-mt-4">
-          {selected ? (
+        {/* The tapped flight, who it is and its fun facts, on phones only:
+            on desktop it takes over its board beside the radar instead. */}
+        {selected ? (
+          <div ref={pickRef} className="scroll-mt-4 lg:hidden">
             <FlightBoard
               slot={selected.phase === "departing" ? "departing" : "arriving"}
               contact={selected}
@@ -199,13 +200,13 @@ export function AirportPanel({
               onClear={onClear}
               emptyText=""
             />
-          ) : (
-            <p className="flex items-center justify-center gap-2.5 border border-dashed border-line-strong px-4 py-4 text-center text-[13.5px] leading-snug text-ink-dim">
-              <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />
-              Tap any plane on the radar for its flight and fun facts.
-            </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="flex items-center justify-center gap-2.5 border border-dashed border-line-strong px-4 py-4 text-center text-[13.5px] leading-snug text-ink-dim">
+            <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />
+            Tap any plane on the radar for its flight and fun facts.
+          </p>
+        )}
 
         <div className="flex min-w-0 flex-col gap-4 border-t border-line pt-4">
           <div>
