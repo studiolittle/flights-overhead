@@ -4,14 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BeerStein, Broadcast } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
-import type { ApiResponse, Contact, Station } from "@/lib/types";
+import type { ApiResponse, Contact } from "@/lib/types";
 import { AirportPanel } from "./AirportPanel";
-import { StationControls } from "./StationControls";
 import { FlightBoard, type BoardSlot } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
 import { LearningCentre } from "./LearningCentre";
 import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
+import { useAirportConditions } from "./useAirportConditions";
 
 /**
  * 40s is easy on a free community feed: a tab left open all day makes ~2,160
@@ -29,49 +29,24 @@ const POLL_MS = Math.max(
  */
 const MAX_DR_SECONDS = 45;
 
-const KEY_STATION = "fo.station";
-const KEY_RANGE = "fo.range";
-
-function readStore<T>(key: string): T | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStore(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Private mode or blocked storage: preferences just do not persist.
-  }
-}
+/**
+ * Flights are always fetched for 50 km around YOW, the whole approach. The
+ * radar's zoom only changes what it shows.
+ */
+const RANGE_KM = 50;
 
 export function RadarConsole() {
   const [mounted, setMounted] = useState(false);
-  const [station, setStation] = useState<Station | null>(null);
-  const [rangeKm, setRangeKm] = useState(50);
   const [data, setData] = useState<ApiResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const [resolving, setResolving] = useState(false);
-  const [geoError, setGeoError] = useState<string | null>(null);
-
   const pollAbort = useRef<AbortController | null>(null);
 
-  // --- boot: restore preferences -------------------------------------------
+  // --- boot -------------------------------------------------------------------
   useEffect(() => {
-    const storedStation = readStore<Station>(KEY_STATION);
-    const storedRange = readStore<number>(KEY_RANGE);
-
-    if (storedStation) setStation(storedStation);
-    if (typeof storedRange === "number") setRangeKm(storedRange);
-
     setNowTs(Date.now());
     setMounted(true);
   }, []);
@@ -82,11 +57,7 @@ export function RadarConsole() {
     const ac = new AbortController();
     pollAbort.current = ac;
 
-    const params = new URLSearchParams({ range: String(rangeKm) });
-    if (station) {
-      params.set("lat", String(station.lat));
-      params.set("lon", String(station.lon));
-    }
+    const params = new URLSearchParams({ range: String(RANGE_KM) });
 
     try {
       const res = await fetch(`/api/flights?${params}`, {
@@ -97,21 +68,11 @@ export function RadarConsole() {
       const json = (await res.json()) as ApiResponse;
       setData(json);
       setFetchError(null);
-      // Adopt the server's default station on first load.
-      setStation(
-        (prev) =>
-          prev ?? {
-            lat: json.home.lat,
-            lon: json.home.lon,
-            label: json.homeLabel,
-            query: json.homeQuery,
-          },
-      );
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setFetchError((err as Error).message || "Network error");
     }
-  }, [rangeKm, station]);
+  }, []);
 
   useEffect(() => {
     if (!mounted) return;
@@ -130,8 +91,8 @@ export function RadarConsole() {
   }, [mounted]);
 
   // --- derived: dead-reckoned live contacts --------------------------------
-  const home = data?.home ?? station ?? { lat: 0, lon: 0 };
-  const effectiveRange = data?.rangeKm ?? rangeKm;
+  const home = data?.home ?? HOME_AIRPORT;
+  const effectiveRange = data?.rangeKm ?? RANGE_KM;
   const overheadRadius = data?.overheadRadiusKm ?? 2.5;
 
   /**
@@ -195,6 +156,9 @@ export function RadarConsole() {
     [reckoned, effectiveRange],
   );
 
+  /** Weather and the runways in use, shared by the runways strip and the map. */
+  const airport = useAirportConditions(reckoned, nowTs || Date.now());
+
   // --- the two boards --------------------------------------------------------
   const selected = selectedId
     ? (reckoned.find((c) => c.id === selectedId) ?? null)
@@ -218,40 +182,13 @@ export function RadarConsole() {
   const arriving = lead("arriving");
   const departing = lead("departing");
 
+  /**
+   * The flight the Learning Centre's tags describe: the one you picked, else
+   * the next arrival, else the latest departure.
+   */
+  const focus = selected ?? arriving.contact ?? departing.contact;
+
   // --- actions --------------------------------------------------------------
-  const applyStation = useCallback(async (query: string) => {
-    setResolving(true);
-    setGeoError(null);
-    try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`, {
-        cache: "no-store",
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setGeoError(json?.error ?? "Location not found.");
-        return;
-      }
-      const next: Station = {
-        lat: json.lat,
-        lon: json.lon,
-        label: json.label,
-        query,
-      };
-      setStation(next);
-      writeStore(KEY_STATION, next);
-      setSelectedId(null);
-    } catch {
-      setGeoError("Location lookup failed.");
-    } finally {
-      setResolving(false);
-    }
-  }, []);
-
-  const applyRange = useCallback((km: number) => {
-    setRangeKm(km);
-    writeStore(KEY_RANGE, km);
-  }, []);
-
   const toggleSelect = useCallback((id: string) => {
     setSelectedId((cur) => (cur === id ? null : id));
   }, []);
@@ -308,67 +245,71 @@ export function RadarConsole() {
           INITIALISING
         </div>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
-          {/* Main: what is landing and what is taking off. min-w-0: grid
-              items default to min-width:auto and would otherwise refuse to
-              shrink below their longest text. */}
-          <div className="flex min-w-0 flex-col gap-4">
-            <FlightBoard
-              slot="arriving"
-              contact={arriving.contact}
-              overhead={arriving.contact?.overhead ?? false}
-              pinned={arriving.pinned}
-              onClear={clearSelection}
-              emptyText={
-                loading
-                  ? `Scanning the sky around ${code}…`
-                  : `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
-              }
-            />
-            <FlightBoard
-              slot="departing"
-              contact={departing.contact}
-              overhead={departing.contact?.overhead ?? false}
-              pinned={departing.pinned}
-              onClear={clearSelection}
-              emptyText={
-                loading
-                  ? `Scanning the sky around ${code}…`
-                  : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
-              }
-            />
-            <InRangeList
-              contacts={live}
-              selectedId={selectedId}
-              onSelect={toggleSelect}
-              title={`${code} TRAFFIC`}
-              emptyText={`No ${code} arrivals or departures within ${Math.round(effectiveRange)} km.`}
-            />
-            <StationControls
-              /* Remount when the applied station changes so the field
-                 shows the value that is actually in effect. */
-              key={station?.query ?? "unset"}
-              query={station?.query ?? ""}
-              stationLabel={station?.label ?? null}
-              rangeKm={rangeKm}
-              onSetStation={applyStation}
-              onSetRange={applyRange}
-              resolving={resolving}
-              error={geoError}
-              nowTs={nowTs}
-            />
+        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,400px)] lg:items-start">
+          {/* On desktop the two wrappers below are real columns. Narrower,
+              they are display:contents, so `order` can interleave their
+              children: airport, the two boards, learning, then traffic.
+              min-w-0: grid and flex items default to
+              min-width:auto and would otherwise refuse to shrink below their
+              longest text. */}
+
+          {/* Main: the airport and its runways in use, then learning. */}
+          <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+            <div className="order-1 min-w-0 lg:order-none">
+              <AirportPanel
+                contacts={reckoned}
+                selectedId={selectedId}
+                onSelect={toggleSelect}
+                nowTs={nowTs || Date.now()}
+                weather={airport.weather}
+                weatherError={airport.weatherError}
+                landing={airport.landing}
+                takeoff={airport.takeoff}
+              />
+            </div>
+            <div className="order-3 min-w-0 lg:order-none">
+              <LearningCentre flight={focus} />
+            </div>
           </div>
 
-          {/* Side: the airport at a glance, and the glossary. */}
-          <div className="flex min-w-0 flex-col gap-4">
-            <AirportPanel
-              contacts={reckoned}
-              station={home}
-              selectedId={selectedId}
-              onSelect={toggleSelect}
-              nowTs={nowTs || Date.now()}
-            />
-            <LearningCentre />
+          {/* Side: what is landing and what is taking off, then the full
+              traffic list. */}
+          <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+            <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-none">
+              <FlightBoard
+                slot="arriving"
+                contact={arriving.contact}
+                overhead={arriving.contact?.overhead ?? false}
+                pinned={arriving.pinned}
+                onClear={clearSelection}
+                emptyText={
+                  loading
+                    ? `Scanning the sky around ${code}…`
+                    : `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
+                }
+              />
+              <FlightBoard
+                slot="departing"
+                contact={departing.contact}
+                overhead={departing.contact?.overhead ?? false}
+                pinned={departing.pinned}
+                onClear={clearSelection}
+                emptyText={
+                  loading
+                    ? `Scanning the sky around ${code}…`
+                    : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
+                }
+              />
+            </div>
+            <div className="order-4 flex min-w-0 flex-col gap-4 lg:order-none">
+              <InRangeList
+                contacts={live}
+                selectedId={selectedId}
+                onSelect={toggleSelect}
+                title={`${code} TRAFFIC`}
+                emptyText={`No ${code} arrivals or departures within ${Math.round(effectiveRange)} km.`}
+              />
+            </div>
           </div>
         </div>
       )}

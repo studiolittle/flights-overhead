@@ -1079,3 +1079,8 @@ export function factsFor(
   const key = icaoType.trim().toUpperCase();
   return BY_ICAO.get(key) ?? BY_ICAO.get(ALIASES[key] ?? "") ?? null;
 }
+
+/** Just the leading 4-digit year, e.g. "1994 (A321neo: 2017)" -> "1994". */
+export function firstYear(service: string): string {
+  return service.match(/\d{4}/)?.[0] ?? service;
+}

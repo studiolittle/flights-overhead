@@ -16,10 +16,10 @@ export const metadata: Metadata = {
 
 /**
  * Resolves the theme to a concrete `data-theme` value before first paint:
- * a saved choice wins, otherwise light. Runs synchronously so there is no
+ * a saved choice wins, otherwise dark. Runs synchronously so there is no
  * flash of the wrong palette.
  */
-const themeInit = `(function(){try{var s=localStorage.getItem('fo.theme');document.documentElement.dataset.theme=(s==='dark')?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();`;
+const themeInit = `(function(){try{var s=localStorage.getItem('fo.theme');document.documentElement.dataset.theme=(s==='light')?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export default function RootLayout({
   children,

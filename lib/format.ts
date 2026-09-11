@@ -36,6 +36,31 @@ export function compass16(deg: number): string {
   return dirs[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 }
 
+const COMPASS_WORDS: Record<string, string> = {
+  N: "north",
+  NNE: "north-northeast",
+  NE: "northeast",
+  ENE: "east-northeast",
+  E: "east",
+  ESE: "east-southeast",
+  SE: "southeast",
+  SSE: "south-southeast",
+  S: "south",
+  SSW: "south-southwest",
+  SW: "southwest",
+  WSW: "west-southwest",
+  W: "west",
+  WNW: "west-northwest",
+  NW: "northwest",
+  NNW: "north-northwest",
+};
+
+/** The 16-point direction in words, e.g. 320 -> "northwest". */
+export function compassWord(deg: number): string {
+  const abbr = compass16(deg);
+  return COMPASS_WORDS[abbr] ?? abbr;
+}
+
 export function ageLabel(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   if (s < 60) return `${s}s`;

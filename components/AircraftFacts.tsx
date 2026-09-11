@@ -1,15 +1,11 @@
 "use client";
 
-import { factsFor } from "@/lib/facts";
-
-/** Just the leading 4-digit year, e.g. "1994 (A321neo: 2017)" -> "1994". */
-function firstYear(service: string): string {
-  return service.match(/\d{4}/)?.[0] ?? service;
-}
+import { Lightbulb } from "@phosphor-icons/react/dist/ssr";
+import { factsFor, firstYear } from "@/lib/facts";
 
 /**
- * Fun facts about the aircraft type. Always shown in full: learning is the
- * point of the app, so this is never folded away.
+ * Fun facts about the aircraft type: the part of the card people come for,
+ * so it is never folded away, even on the compact boards.
  */
 export function AircraftFacts({
   icaoType,
@@ -28,20 +24,21 @@ export function AircraftFacts({
     .join(" · ");
 
   return (
-    <div className="border-t border-line pt-4">
-      <p className="text-[11.5px] tracking-[0.18em] text-ink-faint">
-        FUN FACTS · <span className="text-ink-dim">{f.name.toUpperCase()}</span>
+    <div className="border-t border-line pt-3.5">
+      <p className="flex items-center gap-2 text-[11.5px] tracking-[0.2em] text-accent-ink">
+        <Lightbulb size={14} weight="bold" className="shrink-0" />
+        FUN FACTS · {f.name.toUpperCase()}
       </p>
-      <p className="mt-1.5 text-[12.5px] leading-snug text-ink-faint">{meta}</p>
-      <div className="mt-3 flex flex-col gap-2.5 text-[14px] leading-relaxed text-ink">
+      <div className="mt-2.5 flex flex-col gap-2.5 text-[14px] leading-relaxed text-ink">
         <p>{f.fact1}</p>
         {f.fact2 && <p>{f.fact2}</p>}
       </div>
       {f.note && (
-        <p className="mt-3 border-l-2 border-line-strong pl-3 text-[12.5px] leading-relaxed text-ink-dim">
+        <p className="mt-2.5 border-l-2 border-accent pl-3 text-[12.5px] leading-relaxed text-ink-dim">
           {f.note}
         </p>
       )}
+      <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">{meta}</p>
     </div>
   );
 }

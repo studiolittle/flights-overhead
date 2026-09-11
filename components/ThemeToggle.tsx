@@ -8,14 +8,14 @@ type Theme = "light" | "dark";
 const KEY = "fo.theme";
 
 function currentTheme(): Theme {
-  if (typeof document === "undefined") return "light";
-  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  if (typeof document === "undefined") return "dark";
+  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
 export function ThemeToggle() {
   // The blocking script in layout.tsx set data-theme before paint; mirror it
   // once mounted so the switch reflects reality and hydration stays clean.
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("dark");
   const [mounted, setMounted] = useState(false);
   const [animate, setAnimate] = useState(false);
 

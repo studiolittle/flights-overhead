@@ -41,12 +41,15 @@ export function LearnMore({ children }: { children: ReactNode }) {
 export function FieldRow({
   label,
   example,
+  live = false,
   blurb,
   more,
 }: {
   label: string;
   /** How the term appears in the app, shown as a small chip. */
   example?: string;
+  /** The chip shows a flight on the board right now, not a stock example. */
+  live?: boolean;
   blurb: ReactNode;
   more: ReactNode;
 }) {
@@ -57,7 +60,11 @@ export function FieldRow({
           {label}
         </span>
         {example && (
-          <span className="border border-line bg-surface-2 px-1.5 py-0.5 text-[11.5px] leading-none tracking-[0.04em] text-ink-dim">
+          <span
+            className={`border bg-surface-2 px-1.5 py-0.5 text-[11.5px] leading-tight tracking-[0.04em] ${
+              live ? "border-accent text-accent-ink" : "border-line text-ink-dim"
+            }`}
+          >
             {example}
           </span>
         )}
@@ -78,12 +85,15 @@ export function GlossarySection({
   title,
   summary,
   children,
+  defaultOpen = false,
 }: {
   title: string;
   summary: string;
   children: ReactNode;
+  /** Start expanded, for the topic people reach for most. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const panelId = useId();
 
   return (

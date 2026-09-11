@@ -9,7 +9,7 @@ import {
   X,
 } from "@phosphor-icons/react/dist/ssr";
 import { PHASE_LABEL } from "@/lib/classify";
-import { decodeCallsign, categoryLabel, squawkInfo } from "@/lib/aircraft";
+import { categoryLabel, flightTitle, squawkInfo } from "@/lib/aircraft";
 import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
 import type { Contact } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
@@ -54,32 +54,8 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="h-[68px] w-[110px] border border-line object-cover"
+      className="h-[52px] w-[84px] border border-line object-cover"
     />
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11.5px] tracking-[0.18em] text-ink-faint">
-        {label}
-      </span>
-      <span
-        className="text-[17px] leading-none"
-        style={{ color: tone ?? "var(--color-ink)" }}
-      >
-        {value}
-      </span>
-    </div>
   );
 }
 
@@ -91,8 +67,9 @@ function Stat({
 const BOARD_SWAP_MS = 200;
 
 /**
- * One side of the board: the flight currently leading arrivals or departures,
- * kept to the essentials. The Learning Centre explains the terms.
+ * One side of the board: the flight currently leading arrivals or departures.
+ * Compact, for the side column. Fun facts lead; the live numbers stay, but as
+ * one quiet line.
  */
 export function FlightBoard({
   slot,
@@ -155,15 +132,15 @@ export function FlightBoard({
     return (
       <div className={`panel board-swap ${swapClass} flex flex-col`}>
         <div
-          className="flex items-center gap-3 border-b border-line px-5 py-3"
+          className="flex items-center gap-2.5 border-b border-line px-4 py-2.5"
           style={{ borderLeft: `4px solid ${style.ink}`, color: style.ink }}
         >
-          <SlotIcon slot={slot} size={20} />
-          <span className="whitespace-nowrap text-[15px] leading-none tracking-[0.28em]">
+          <SlotIcon slot={slot} size={18} />
+          <span className="whitespace-nowrap text-[14px] leading-none tracking-[0.24em]">
             {PHASE_LABEL[slot]}
           </span>
         </div>
-        <div className="flex items-center gap-3 px-5 py-6">
+        <div className="flex items-center gap-3 px-4 py-5">
           <BeerStein size={22} weight="bold" className="shrink-0 text-accent-ink" />
           <p className="text-[13.5px] leading-relaxed text-ink-faint">
             {emptyText}
@@ -174,15 +151,9 @@ export function FlightBoard({
   }
 
   const e = shown.enrichment;
-  const cs = decodeCallsign(shown.callsign);
   const squawk = squawkInfo(shown.squawk);
   const category = categoryLabel(shown.category);
-
-  // The curated designator table wins: adsbdb occasionally maps a prefix to a
-  // different carrier that shares it (ROU comes back as a Chilean airline).
-  const operator = cs.operator ?? e?.airlineName ?? e?.owner ?? null;
-  const title =
-    operator && cs.flightNumber ? `${operator} ${cs.flightNumber}` : cs.label;
+  const title = flightTitle(shown);
 
   const typeLine = [
     e?.manufacturer && e?.type
@@ -196,7 +167,17 @@ export function FlightBoard({
   const kt = msToKt(shown.velocityMs);
   const fpm = msToFpm(shown.verticalRateMs);
   const vs = shown.verticalRateMs ?? 0;
-  const vsLabel = vs > 0.5 ? "CLIMBING" : vs < -0.5 ? "DESCENDING" : "VERTICAL";
+  const absFpm = fpm == null ? null : Math.abs(Math.round(fpm)).toLocaleString();
+
+  const numbers = [
+    shown.baroAltitudeM != null ? flightLevel(shown.baroAltitudeM) : null,
+    kt != null ? `${Math.round(kt)} kt` : null,
+    absFpm && vs > 0.5 ? `climbing ${absFpm} fpm` : null,
+    absFpm && vs < -0.5 ? `descending ${absFpm} fpm` : null,
+    `${shown.distanceKm.toFixed(1)} km ${compass16(shown.bearingDeg)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
@@ -207,13 +188,13 @@ export function FlightBoard({
       }}
     >
       <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5"
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5"
         style={{ background: style.bg, color: style.fg }}
       >
         <span className={shownOverhead ? "pulse-soft" : undefined}>
-          <SlotIcon slot={slot} size={26} />
+          <SlotIcon slot={slot} size={20} />
         </span>
-        <span className="whitespace-nowrap text-[19px] font-semibold leading-none tracking-[0.2em] md:text-[22px]">
+        <span className="whitespace-nowrap text-[15px] font-semibold leading-none tracking-[0.2em]">
           {PHASE_LABEL[slot]}
         </span>
 
@@ -250,14 +231,14 @@ export function FlightBoard({
         </span>
       </div>
 
-      <div className="flex flex-col gap-4 p-5">
+      <div className="flex flex-col gap-3.5 p-4">
         {/* Identity */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-[24px] leading-[1.12] text-pretty break-words text-ink md:text-[30px]">
+            <h2 className="text-[20px] leading-[1.15] text-pretty break-words text-ink">
               {title}
             </h2>
-            <p className="mt-1.5 text-[13.5px] text-ink-dim">
+            <p className="mt-1 text-[12.5px] text-ink-dim">
               {typeLine || "Aircraft type unavailable"}
             </p>
           </div>
@@ -295,36 +276,19 @@ export function FlightBoard({
             )}
           </div>
         ) : (
-          <p className="text-[13.5px] text-ink-faint">
+          <p className="text-[12.5px] text-ink-faint">
             No route filed for this callsign.
           </p>
         )}
 
-        {/* Live numbers */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-t border-line pt-4 sm:grid-cols-4">
-          <Stat label="ALTITUDE" value={flightLevel(shown.baroAltitudeM)} />
-          <Stat
-            label="GROUND SPEED"
-            value={kt != null ? `${Math.round(kt)} kt` : "--"}
-          />
-          <Stat
-            label={vsLabel}
-            value={
-              fpm != null
-                ? `${Math.abs(Math.round(fpm)).toLocaleString()} fpm`
-                : "--"
-            }
-            tone={vsLabel === "VERTICAL" ? undefined : style.ink}
-          />
-          <Stat
-            label="DISTANCE"
-            value={`${shown.distanceKm.toFixed(1)} km ${compass16(shown.bearingDeg)}`}
-            tone={shownOverhead ? "var(--color-alert)" : undefined}
-          />
-        </div>
-
-        {/* Fun facts about this aircraft type, always shown */}
+        {/* Fun facts lead: they are what people come for */}
         <AircraftFacts icaoType={e?.icaoType} />
+
+        {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
+        <p className="border-t border-line pt-2.5 text-[12px] leading-relaxed tracking-[0.04em] text-ink-faint">
+          <span className="mr-2 text-[11px] tracking-[0.18em]">LIVE</span>
+          {numbers}
+        </p>
       </div>
     </div>
   );
@@ -339,8 +303,8 @@ function Endpoint({
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-baseline gap-2">
-      <span className="text-[20px] leading-none text-ink">{code ?? "???"}</span>
-      <span className="truncate text-[12.5px] text-ink-dim">
+      <span className="text-[17px] leading-none text-ink">{code ?? "???"}</span>
+      <span className="truncate text-[12px] text-ink-dim">
         {city ?? "Unknown"}
       </span>
     </div>

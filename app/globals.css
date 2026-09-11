@@ -14,7 +14,6 @@
  *  `data-theme` before first paint, so CSS only needs two states.
  * ------------------------------------------------------------------ */
 
-:root,
 :root[data-theme="light"] {
   color-scheme: light;
 
@@ -41,6 +40,9 @@
   --c-vignette: rgb(24 33 31 / 0.05);
 }
 
+/* Dark is the default: it also covers the no-script case, where nothing sets
+   data-theme. The attribute selector above still wins for a saved "light". */
+:root,
 :root[data-theme="dark"] {
   color-scheme: dark;
 

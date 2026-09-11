@@ -1,6 +1,8 @@
 // Decoding helpers for the raw ADS-B fields: turning a callsign into an
 // operator and a flight number, and the coded enumerations into words.
 
+import type { Contact } from "./types";
+
 /**
  * ICAO three-letter airline designators. Weighted toward carriers that
  * actually show up over Canada, plus the major international operators.
@@ -228,6 +230,18 @@ export function categoryLabel(category: string | null): string | null {
   if (!category) return null;
   // A0/B0/C0 mean "no information", so there is nothing worth showing.
   return CATEGORIES[category.toUpperCase()] ?? null;
+}
+
+/**
+ * The flight the way a person would say it, e.g. "Air Canada 461". The
+ * curated designator table wins: adsbdb occasionally maps a prefix to a
+ * different carrier that shares it (ROU comes back as a Chilean airline).
+ */
+export function flightTitle(c: Contact): string {
+  const cs = decodeCallsign(c.callsign);
+  const e = c.enrichment;
+  const operator = cs.operator ?? e?.airlineName ?? e?.owner ?? null;
+  return operator && cs.flightNumber ? `${operator} ${cs.flightNumber}` : cs.label;
 }
 
 export function squawkInfo(
