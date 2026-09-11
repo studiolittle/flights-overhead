@@ -52,7 +52,6 @@ credentials off the client and cache aggressively:
 | `/api/flights` | Live positions, plus range/bearing, airframe, route and phase |
 | `/api/geocode` | Postal code / place name to coordinates |
 | `/api/weather` | Latest CYOW METAR (wind, visibility, altimeter), cached 5 min |
-| `/api/presence` | "Users online" count: each browser checks in every 30 s with a random id, held in Vercel's Runtime Cache |
 
 ### Data sources
 

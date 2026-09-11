@@ -10,7 +10,6 @@ import { StationControls } from "./StationControls";
 import { FlightBoard, type BoardSlot } from "./FlightBoard";
 import { InRangeList } from "./InRangeList";
 import { LearningCentre } from "./LearningCentre";
-import { OnlineCount } from "./OnlineCount";
 import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -263,8 +262,7 @@ export function RadarConsole() {
   const code = HOME_AIRPORT.iata;
 
   return (
-    // pb-24: room to scroll the footer clear of the pinned online counter.
-    <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 pb-24 md:p-6 md:pb-24">
+    <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
           <Broadcast size={26} weight="bold" className="text-accent-ink" />
@@ -399,8 +397,6 @@ export function RadarConsole() {
           info@studiolittle.ca
         </a>
       </footer>
-
-      {mounted && <OnlineCount />}
     </main>
   );
 }
