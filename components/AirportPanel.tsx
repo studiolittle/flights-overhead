@@ -6,7 +6,6 @@ import {
   AirplaneTakeoff,
   BeerStein,
   HandTap,
-  Wind as WindIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import { HOME_AIRPORT } from "@/lib/config";
 import { compass16 } from "@/lib/format";
@@ -65,9 +64,9 @@ function runwayHeading(ident: string): number | null {
 
 /**
  * The airport at a glance, first thing on the page: the radar with every
- * YOW flight nearby, the runways in use in one line, the local time, the
- * flight you tapped with its fun facts, then the wind and the latest weather
- * report. The weather and the runway calls come from `useAirportConditions`.
+ * YOW flight nearby, a tidy left-aligned list of the runways in use, wind,
+ * weather and local time, then the flight you tapped with its fun facts. The
+ * weather and the runway calls come from `useAirportConditions`.
  */
 export function AirportPanel({
   contacts,
@@ -168,24 +167,63 @@ export function AirportPanel({
             />
             <ZoomControl value={zoomKm} onChange={zoom} />
           </div>
+        </div>
+
+        {/* Everything the radar can't show, in one tidy list. */}
+        <div className="flex flex-col gap-3">
           <Legend />
-          <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[12.5px]">
-            <RunwayNote
-              label="LANDING"
-              icon={<AirplaneLanding size={14} weight="bold" />}
-              color={ARRIVAL_COLOR}
-              call={landing}
-              op="arrival"
-            />
-            <RunwayNote
-              label="TAKING OFF"
-              icon={<AirplaneTakeoff size={14} weight="bold" />}
-              color={DEPART_COLOR}
-              call={takeoff}
-              op="departure"
-            />
-          </div>
-          <LocalTime nowTs={nowTs} />
+          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 border-t border-line pt-3 text-[12.5px] leading-snug text-ink-dim">
+            <InfoRow label="LANDING">
+              <RunwayValue
+                icon={<AirplaneLanding size={13} weight="bold" />}
+                color={ARRIVAL_COLOR}
+                call={landing}
+                op="arrival"
+              />
+            </InfoRow>
+            <InfoRow label="TAKING OFF">
+              <RunwayValue
+                icon={<AirplaneTakeoff size={13} weight="bold" />}
+                color={DEPART_COLOR}
+                call={takeoff}
+                op="departure"
+              />
+            </InfoRow>
+            <InfoRow label="WIND">
+              {wind ? (
+                <>
+                  {windHeadline(wind)}
+                  {wind.dirDeg != null && wind.speedKt > 0 && (
+                    <span className="text-ink-faint">
+                      {" "}
+                      · from the {compass16(wind.dirDeg)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-ink-faint">
+                  {weatherError
+                    ? `Unavailable: ${weatherError}`
+                    : "Loading the latest METAR"}
+                </span>
+              )}
+            </InfoRow>
+            {conditions && <InfoRow label="WEATHER">{conditions}</InfoRow>}
+            <InfoRow label="LOCAL TIME">
+              <LocalTime nowTs={nowTs} />
+            </InfoRow>
+            {weather?.raw && (
+              <InfoRow label="METAR">
+                <span className="break-words text-[11.5px] text-ink-faint">
+                  {/* The row label already says METAR. */}
+                  {weather.raw.replace(/^METAR\s+/, "")}
+                  {weather.observedAt
+                    ? ` · ${minutesAgo(nowTs - weather.observedAt)}`
+                    : ""}
+                </span>
+              </InfoRow>
+            )}
+          </dl>
         </div>
 
         {/* The tapped flight, who it is and its fun facts, on phones only:
@@ -202,74 +240,36 @@ export function AirportPanel({
             />
           </div>
         ) : (
-          <p className="flex items-center justify-center gap-2.5 border border-dashed border-line-strong px-4 py-4 text-center text-[13.5px] leading-snug text-ink-dim">
+          <p className="flex items-center gap-2.5 border border-dashed border-line-strong px-4 py-3.5 text-[13.5px] leading-snug text-ink-dim">
             <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />
             Tap any plane on the radar for its flight and fun facts.
           </p>
         )}
 
-        <div className="flex min-w-0 flex-col gap-4 border-t border-line pt-4">
-          <div>
-            <p className="text-[11.5px] tracking-[0.18em] text-ink-faint">
-              WIND
-            </p>
-            {wind ? (
-              <>
-                <p className="mt-2 flex items-center gap-2.5 text-[18px] leading-tight text-ink">
-                  <WindIcon
-                    size={18}
-                    weight="bold"
-                    className="shrink-0 text-accent-ink"
-                  />
-                  {windHeadline(wind)}
-                </p>
-                <p className="mt-1.5 text-[13px] text-ink-dim">
-                  {[
-                    wind.dirDeg != null && wind.speedKt > 0
-                      ? `From the ${compass16(wind.dirDeg)}`
-                      : null,
-                    weather?.observedAt
-                      ? `reported ${minutesAgo(nowTs - weather.observedAt)}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(", ")}
-                </p>
-              </>
-            ) : (
-              <p className="mt-2 text-[13px] text-ink-dim">
-                {weatherError
-                  ? `Weather unavailable: ${weatherError}`
-                  : "Loading the latest METAR"}
-              </p>
-            )}
-          </div>
-
-          {conditions && (
-            <p className="border-t border-line pt-4 text-[13px] text-ink-dim">
-              {conditions}
-            </p>
-          )}
-          {weather?.raw && (
-            <p className="break-words text-[12px] leading-relaxed text-ink-faint">
-              {weather.raw}
-            </p>
-          )}
-        </div>
       </div>
     </section>
   );
 }
 
-/** One runway in use, in a line: "LANDING RWY 32 in from the SE". */
-function RunwayNote({
-  label,
+/** One labelled row of the list under the radar. */
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-[10.5px] tracking-[0.16em] text-ink-faint">
+        {label}
+      </dt>
+      <dd className="min-w-0">{children}</dd>
+    </>
+  );
+}
+
+/** A runway in use: "RWY 32 in from the SE". */
+function RunwayValue({
   icon,
   color,
   call,
   op,
 }: {
-  label: string;
   icon: ReactNode;
   color: string;
   call: RunwayCall;
@@ -284,11 +284,8 @@ function RunwayNote({
         ? `in from the ${compass16(h + 180)}`
         : `out to the ${compass16(h)}`;
   return (
-    <span className="flex items-center gap-1.5 whitespace-nowrap">
+    <span className="flex flex-wrap items-center gap-x-1.5">
       <span style={{ color }}>{icon}</span>
-      <span className="text-[11px] tracking-[0.16em] text-ink-faint">
-        {label}
-      </span>
       <span style={{ color: call.ident ? color : "var(--color-ink-faint)" }}>
         {call.ident ? `RWY ${call.ident}` : "--"}
       </span>
@@ -329,11 +326,11 @@ function ZoomControl({
   );
 }
 
-/** Local time and date under the radar. */
+/** Local time and date, for the list under the radar. */
 function LocalTime({ nowTs }: { nowTs: number }) {
   const now = new Date(nowTs);
   return (
-    <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[12.5px] text-ink-dim">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <span className="status-dot" aria-hidden="true" />
       {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
       <span className="text-ink-faint">
@@ -344,16 +341,16 @@ function LocalTime({ nowTs }: { nowTs: number }) {
         })}
       </span>
       <span className="flex items-center gap-1 text-ink-faint">
-        <BeerStein size={13} weight="bold" className="text-accent-ink" />
+        <BeerStein size={12} weight="bold" className="text-accent-ink" />
         It&apos;s 5 o&apos;clock somewhere
       </span>
-    </p>
+    </span>
   );
 }
 
 function Legend() {
   return (
-    <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[11.5px] tracking-[0.14em] text-ink-faint">
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11.5px] tracking-[0.14em] text-ink-faint">
       <span className="flex items-center gap-1.5">
         <span
           className="inline-block size-2 rounded-full"

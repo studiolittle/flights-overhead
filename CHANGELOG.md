@@ -2,7 +2,17 @@
 
 What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest first.
 
-## September 11, 2026
+## v0.4.0 · September 11, 2026
+
+### A tidier airport panel
+
+- The wind, weather, local time and the raw weather report (METAR) move up
+  into one compact list under the radar, right beside the runways in use.
+- Everything in it is small and left-aligned, with a label for each row.
+- The big wind and weather block at the bottom of the panel is gone.
+- The radar's colour key and the "Tap any plane" hint are left-aligned too.
+
+## v0.3.0 · September 11, 2026
 
 ### Tap a plane, see its story
 
@@ -39,7 +49,7 @@ What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest fi
 - Dark mode is now the default. The light theme is still one tap away.
 - Added Google Analytics to count visitors.
 
-## September 10, 2026
+## v0.2.0 · September 10, 2026
 
 ### Learn as you watch
 
@@ -64,7 +74,7 @@ What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest fi
   reminder that it's 5 o'clock somewhere.
 - Status details moved to the footer; desktop notifications removed.
 
-## September 9, 2026
+## v0.1.0 · September 9, 2026
 
 - **First release:** a live board of the aircraft passing overhead, with
   what each plane is and where it came from.
