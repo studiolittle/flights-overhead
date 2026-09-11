@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
-  BeerStein,
   HandTap,
 } from "@phosphor-icons/react/dist/ssr";
 import { HOME_AIRPORT } from "@/lib/config";
@@ -339,10 +338,6 @@ function LocalTime({ nowTs }: { nowTs: number }) {
           month: "short",
           day: "numeric",
         })}
-      </span>
-      <span className="flex items-center gap-1 text-ink-faint">
-        <BeerStein size={12} weight="bold" className="text-accent-ink" />
-        It&apos;s 5 o&apos;clock somewhere
       </span>
     </span>
   );

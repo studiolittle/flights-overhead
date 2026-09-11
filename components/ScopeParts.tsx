@@ -3,6 +3,7 @@
 // Shared SVG pieces for the radar and the airport scope, so an aircraft looks
 // the same on both.
 
+import { isRotorcraft } from "@/lib/aircraft";
 import { flightLevel, metersToFt } from "@/lib/format";
 import type { Contact, FlightPhase } from "@/lib/types";
 
@@ -20,6 +21,21 @@ const FRAME_OPACITY = 0.5;
  */
 const PLANE_PATH =
   "M 0 -22 C 2.2 -22 3 -19 3 -16 L 3 -6 L 21 4 L 21 8 L 3 3 L 3 13 L 9 18 L 9 21 L 0 19 L -9 21 L -9 18 L -3 13 L -3 3 L -21 8 L -21 4 L -3 -6 L -3 -16 C -3 -19 -2.2 -22 0 -22 Z";
+
+/**
+ * Top-down helicopter, nose up: a rounded cabin, a thin tail boom and the
+ * tail rotor across its end. The main rotor is drawn on its own so it can
+ * spin, centred on the mast at HELI_MAST_Y.
+ */
+const HELI_BODY =
+  "M 0 -13 C 5 -13 7 -8 7 -3 C 7 3 4 7 0 7 C -4 7 -7 3 -7 -3 C -7 -8 -5 -13 0 -13 Z " +
+  "M -1.6 6 L 1.6 6 L 1.1 19 L -1.1 19 Z " +
+  "M -5.5 18 L 5.5 18 L 5.5 21 L -5.5 21 Z";
+const HELI_MAST_Y = -3;
+
+/** Four main-rotor blades, ~44 units tip to tip, centred on the mast. */
+const ROTOR_BLADES =
+  "M -22 -1 L 22 -1 L 22 1 L -22 1 Z M -1 -22 L 1 -22 L 1 22 L -1 22 Z";
 
 /**
  * A stroke in the panel colour painted under the fill: lifts planes and their
@@ -158,6 +174,8 @@ export function Blip({
 }) {
   const track = c.trackDeg ?? 0;
   const altFt = metersToFt(c.baroAltitudeM);
+  const heli = isRotorcraft(c);
+  const iconScale = selected ? 1.35 : 1.2;
 
   return (
     <g
@@ -166,7 +184,7 @@ export function Blip({
       onClick={() => onSelect(c.id)}
       role="button"
       tabIndex={0}
-      aria-label={`${c.callsign}, ${flightLevel(c.baroAltitudeM)}, ${distanceKm.toFixed(1)} kilometres`}
+      aria-label={`${heli ? "Helicopter " : ""}${c.callsign}, ${flightLevel(c.baroAltitudeM)}, ${distanceKm.toFixed(1)} kilometres`}
       onKeyDown={(ev) => {
         if (ev.key === "Enter" || ev.key === " ") {
           ev.preventDefault();
@@ -201,13 +219,31 @@ export function Blip({
       )}
 
       <g className="blip-body">
-        <path
-          d={PLANE_PATH}
-          transform={`rotate(${track}) scale(${selected ? 1.35 : 1.2})`}
-          fill={color}
-          strokeWidth={2.5}
-          style={HALO}
-        />
+        {heli ? (
+          <g transform={`rotate(${track}) scale(${iconScale})`}>
+            <path d={HELI_BODY} fill={color} strokeWidth={2.5} style={HALO} />
+            <g transform={`translate(0 ${HELI_MAST_Y})`}>
+              {/* The blur of the blades, under the blades themselves. */}
+              <circle r={22} fill={color} opacity={0.14} />
+              <g className="rotor">
+                <path
+                  d={ROTOR_BLADES}
+                  fill={color}
+                  strokeWidth={1.5}
+                  style={HALO}
+                />
+              </g>
+            </g>
+          </g>
+        ) : (
+          <path
+            d={PLANE_PATH}
+            transform={`rotate(${track}) scale(${iconScale})`}
+            fill={color}
+            strokeWidth={2.5}
+            style={HALO}
+          />
+        )}
         <text
           x={34}
           y={-8}

@@ -391,6 +391,20 @@ body::after {
   animation: pulse-ring 1800ms ease-out infinite;
 }
 
+/* A helicopter's main rotor, spinning about its mast. The blades are drawn
+   symmetric about the mast, so their box centre is the mast. */
+@keyframes rotor-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rotor {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rotor-spin 700ms linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body {
     transition: none;
@@ -403,7 +417,8 @@ body::after {
   .blip-body,
   .pulse-ring,
   .pulse-soft,
-  .status-dot {
+  .status-dot,
+  .rotor {
     animation: none;
   }
   .blip {

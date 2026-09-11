@@ -14,20 +14,21 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useAirportConditions } from "./useAirportConditions";
 
 /**
- * 40s is easy on a free community feed: a tab left open all day makes ~2,160
- * requests. Dead reckoning moves the blips between polls, so the board still
- * reads as live.
+ * 10 s matches the server's shared 9 s snapshot, which Vercel's CDN hands to
+ * every visitor: polling faster would only fetch the same snapshot again,
+ * and more visitors don't mean more calls to the feed. Polling pauses while
+ * the tab is hidden. Dead reckoning moves the blips between polls.
  */
 const POLL_MS = Math.max(
-  15_000,
-  Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS) || 40_000,
+  10_000,
+  Number(process.env.NEXT_PUBLIC_POLL_INTERVAL_MS) || 10_000,
 );
 
 /**
  * Cap dead reckoning so a stale snapshot never flies a blip off-scope. Must
  * stay above POLL_MS or blips visibly freeze at the end of every cycle.
  */
-const MAX_DR_SECONDS = 45;
+const MAX_DR_SECONDS = 20;
 
 /**
  * Flights are always fetched for 50 km around YOW, the whole approach. The
@@ -74,13 +75,27 @@ export function RadarConsole() {
     }
   }, []);
 
+  // Poll only while the page is on screen: a background tab costs requests
+  // and shows nothing. Coming back refreshes at once.
   useEffect(() => {
     if (!mounted) return;
-    load();
-    const poll = setInterval(load, POLL_MS);
-    return () => {
-      clearInterval(poll);
+    let poll: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (poll) return;
+      load();
+      poll = setInterval(load, POLL_MS);
+    };
+    const stop = () => {
+      if (poll) clearInterval(poll);
+      poll = null;
       pollAbort.current?.abort();
+    };
+    const onVisibility = () => (document.hidden ? stop() : start());
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      stop();
     };
   }, [mounted, load]);
 

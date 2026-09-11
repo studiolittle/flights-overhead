@@ -2,6 +2,28 @@
 
 What's new on [Flights Overhead](https://flights-overhead.vercel.app), newest first.
 
+## v0.5.0 · September 11, 2026
+
+### Faster updates
+
+- Flights now refresh every 10 seconds instead of every 40, so turns,
+  climbs and descents show up sooner and new arrivals appear quicker.
+- Refreshing pauses while the tab is in the background and catches up the
+  moment you come back.
+- Every visitor shares the same few-seconds-old snapshot, so the site stays
+  light on the free flight-data feed however many people are watching.
+
+### Helicopters
+
+- Helicopters on the radar now look like helicopters, with a spinning main
+  rotor, instead of planes. Think Ornge air ambulances heading for the
+  hospital helipad.
+
+### Also
+
+- The browser tab icon is now an airplane.
+- "It's 5 o'clock somewhere" is gone from the local time.
+
 ## v0.4.0 · September 11, 2026
 
 ### A tidier airport panel

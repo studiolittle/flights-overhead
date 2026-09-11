@@ -1,6 +1,7 @@
 // Decoding helpers for the raw ADS-B fields: turning a callsign into an
 // operator and a flight number, and the coded enumerations into words.
 
+import { factsFor } from "./facts";
 import type { Contact } from "./types";
 
 /**
@@ -242,6 +243,17 @@ export function flightTitle(c: Contact): string {
   const e = c.enrichment;
   const operator = cs.operator ?? e?.airlineName ?? e?.owner ?? null;
   return operator && cs.flightNumber ? `${operator} ${cs.flightNumber}` : cs.label;
+}
+
+/**
+ * A helicopter: the transponder's emitter category says rotorcraft (A7), or
+ * the aircraft type is one the facts table lists as a helicopter. The type
+ * check catches the many helicopters that broadcast no category.
+ */
+export function isRotorcraft(c: Contact): boolean {
+  if (c.category?.toUpperCase() === "A7") return true;
+  const f = factsFor(c.enrichment?.icaoType);
+  return f != null && /helicopter/i.test(f.category);
 }
 
 export function squawkInfo(

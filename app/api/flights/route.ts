@@ -52,6 +52,17 @@ const QUERY_BUFFER = 1.35;
 const CACHE_TTL_MS = 9000;
 const payloadCache = new Map<string, { at: number; data: ApiResponse }>();
 
+/**
+ * Lets Vercel's CDN answer everyone from one good snapshot until it is
+ * CACHE_TTL_MS old. Every visitor watches the same YOW view and so asks for
+ * the same URL, so function runs and upstream calls stay flat however many
+ * people have the page open. The Vercel-only header leaves browsers alone.
+ */
+function cdnHeaders(snapshotAgeMs: number) {
+  const seconds = Math.max(1, Math.floor((CACHE_TTL_MS - snapshotAgeMs) / 1000));
+  return { "Vercel-CDN-Cache-Control": `max-age=${seconds}` };
+}
+
 /** Convert one feed record into our internal (metric) shape. */
 function mapAircraft(a: AdsbAircraft): Contact | null {
   const icao24 = (a.hex ?? "").trim().toLowerCase();
@@ -134,7 +145,9 @@ export async function GET(request: Request) {
   const cacheKey = `${lat.toFixed(3)}:${lon.toFixed(3)}:${rangeKm}`;
   const cached = payloadCache.get(cacheKey);
   if (cached && now - cached.at < CACHE_TTL_MS) {
-    return NextResponse.json(cached.data);
+    return NextResponse.json(cached.data, {
+      headers: cdnHeaders(now - cached.at),
+    });
   }
 
   const base = {
@@ -220,7 +233,7 @@ export async function GET(request: Request) {
     };
 
     payloadCache.set(cacheKey, { at: now, data });
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cdnHeaders(0) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown upstream error";
 
