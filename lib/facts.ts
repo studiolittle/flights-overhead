@@ -226,7 +226,7 @@ const FACTS: AircraftFacts[] = [
     operators: "Sanders Geophysics, small cargo/survey operators",
     service: "1984",
     fact1: "The Caravan was originally developed with FedEx as a launch customer for feeder cargo routes, and small Caravans still fly overnight parcels today.",
-    fact2: "It can be fitted with wheels, skis, or floats, making it one of the most versatile single-engine aircraft ever built.",
+    fact2: "It can be fitted with wheels, skis, or floats, often swapped between seasons on the same airframe.",
     note: "",
   },
   {
@@ -709,7 +709,7 @@ const FACTS: AircraftFacts[] = [
     category: "Bush Plane",
     operators: "Occasional visitor/historic operators",
     service: "1947",
-    fact1: "The Beaver was built in Toronto and is considered one of the most important Canadian aircraft ever made, engineered specifically for bush flying on floats, wheels, or skis.",
+    fact1: "The Beaver was built in Toronto, engineered specifically for bush flying on floats, wheels, or skis.",
     fact2: "The Canadian Engineering Centennial Board named the Beaver one of the top ten Canadian engineering achievements of the 20th century.",
     note: "Ottawa's Canada Aviation and Space Museum, just minutes from YOW, has an original on display",
   },

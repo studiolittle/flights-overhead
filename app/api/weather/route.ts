@@ -84,7 +84,15 @@ export async function GET() {
     cache = { at: now, data };
     return NextResponse.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Weather lookup failed";
+    // AbortSignal.timeout() rejects with a TimeoutError whose message is a
+    // raw runtime string ("The operation was aborted due to timeout") that
+    // would otherwise leak straight into the plain-language UI.
+    const message =
+      err instanceof Error && err.name === "TimeoutError"
+        ? "the weather service didn't respond in time"
+        : err instanceof Error
+          ? err.message
+          : "Weather lookup failed";
 
     // An old observation beats none: the wind rarely swings a runway change
     // inside an hour.
