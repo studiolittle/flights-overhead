@@ -84,7 +84,7 @@ export function ScopeFrame({
             x={C + 7}
             y={C - R_MAX * f + 22}
             fill="var(--color-ink-faint)"
-            fontSize={24}
+            fontSize="var(--type-4)"
           >
             {Math.round(rangeKm * f)}
             {f === 1 ? " KM" : ""}
@@ -117,7 +117,7 @@ export function ScopeFrame({
               x={p.x}
               y={p.y}
               fill="var(--color-ink-dim)"
-              fontSize={27}
+              fontSize="var(--type-4)"
               textAnchor="middle"
               dominantBaseline="middle"
             >
@@ -263,10 +263,10 @@ export function Blip({
           x={34}
           y={-8}
           fill={color}
-          fontSize={32}
+          fontSize="var(--type-5)"
           fontWeight={600}
           strokeWidth={7}
-          style={{ ...HALO, letterSpacing: "0.5px" }}
+          style={{ ...HALO, letterSpacing: "0" }}
         >
           {c.callsign}
         </text>
@@ -274,7 +274,7 @@ export function Blip({
           x={34}
           y={22}
           fill="var(--color-ink-dim)"
-          fontSize={24}
+          fontSize="var(--type-4)"
           strokeWidth={6}
           style={HALO}
         >

@@ -2,10 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import { HandTap, Lightbulb } from "@phosphor-icons/react/dist/ssr";
-import { flightTitle } from "@/lib/aircraft";
-import { factsFor } from "@/lib/facts";
 import type { Contact } from "@/lib/types";
-import { AircraftFacts } from "./AircraftFacts";
 import { FlightBoard } from "./FlightBoard";
 import { SectionHeader } from "./SectionHeader";
 
@@ -38,16 +35,10 @@ export function FunFactsSpot({
     el.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
   }, [selectedId]);
 
-  const featuredFacts = factsFor(featured?.enrichment?.icaoType);
-  const showFeatured = !selected && featured && featuredFacts;
-
-  const status = selected
-    ? "SELECTED"
-    : showFeatured
-      ? featured.phase === "departing"
-        ? "NEAREST DEPARTURE"
-        : "NEAREST ARRIVAL"
-      : null;
+  const aircraft = selected ?? featured;
+  const status = aircraft
+    ? `${selected ? "Selected" : "Featured"} · ${aircraft.phase === "departing" ? "Departing" : aircraft.phase === "arriving" ? "Arriving" : "Nearby"}`
+    : null;
 
   return (
     <section
@@ -57,35 +48,15 @@ export function FunFactsSpot({
     >
       <SectionHeader
         id={headingId}
-        title="FUN FACTS"
+        title="Aircraft spotlight"
         icon={<Lightbulb size={18} weight="bold" />}
         aside={status}
       />
 
-      {selected ? (
-        <FlightBoard
-          variant="picked"
-          slot={selected.phase === "departing" ? "departing" : "arriving"}
-          contact={selected}
-          overhead={selected.overhead ?? false}
-          onClear={onClear}
-          emptyText=""
-        />
-      ) : showFeatured ? (
-        <div className="px-5 py-4">
-          <h3 className="text-[17px] leading-snug text-ink">
-            {flightTitle(featured)}
-          </h3>
-          <div className="mt-3">
-            <AircraftFacts icaoType={featured.enrichment?.icaoType} />
-          </div>
-          <p className="mt-3 flex items-center gap-2 text-[12.5px] leading-snug text-ink-faint">
-            <HandTap size={16} weight="bold" className="shrink-0 text-accent-ink" />
-            Tap any plane on the radar for its flight and fun facts.
-          </p>
-        </div>
+      {aircraft ? (
+        <FlightBoard variant="picked" slot={aircraft.phase === "departing" ? "departing" : "arriving"} contact={aircraft} overhead={aircraft.overhead ?? false} onClear={selected ? onClear : undefined} emptyText="" />
       ) : (
-        <p className="flex items-center gap-2.5 px-5 py-4 text-[13.5px] leading-snug text-ink-dim">
+        <p className="flex items-center gap-2.5 px-5 py-4 text-[length:var(--type-0)] leading-snug text-ink-dim">
           <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />
           Tap any plane on the radar for its flight and fun facts.
         </p>

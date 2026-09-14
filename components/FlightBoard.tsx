@@ -54,7 +54,7 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="h-[52px] w-[84px] border border-line object-cover"
+      className="h-[52px] w-[84px] rounded-lg border border-line object-cover"
     />
   );
 }
@@ -141,20 +141,20 @@ export function FlightBoard({
         className={`panel board-swap ${swapClass} flex flex-col`}
       >
         <div
-          className="flex items-center gap-2.5 border-b border-line px-4 py-2.5"
-          style={{ borderLeft: `4px solid ${style.ink}`, color: style.ink }}
+          className="flex items-center gap-2.5 rounded-t-2xl border-b border-line px-5 py-4"
+          style={{ color: style.ink }}
         >
           <SlotIcon slot={slot} size={18} />
           <h2
             id={headingId}
-            className="whitespace-nowrap text-[14px] leading-none tracking-[0.24em]"
+            className="type-heading whitespace-nowrap text-[length:var(--type-1)]"
           >
             {PHASE_LABEL[slot]}
           </h2>
         </div>
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-5 py-6">
           <BeerStein size={20} weight="bold" className="shrink-0 text-accent-ink" />
-          <p className="text-[13px] leading-relaxed text-ink-faint">
+          <p className="text-[length:var(--type-small)] leading-relaxed text-ink-faint">
             {emptyText}
           </p>
         </div>
@@ -206,29 +206,28 @@ export function FlightBoard({
         picked
           ? undefined
           : {
-              borderColor: style.bg,
-              background: `color-mix(in srgb, ${style.bg} 7%, var(--color-surface))`,
+              borderColor: "var(--color-line)",
             }
       }
     >
       {!picked && (
         <div
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5"
-          style={{ background: style.bg, color: style.fg }}
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-t-2xl border-b border-line px-5 py-4"
+          style={{ background: `color-mix(in srgb, ${style.bg} 8%, var(--color-surface))`, color: style.ink }}
         >
           <span className={shownOverhead ? "pulse-soft" : undefined}>
             <SlotIcon slot={slot} size={18} />
           </span>
           <h2
             id={headingId}
-            className="whitespace-nowrap text-[14px] font-semibold leading-none tracking-[0.2em]"
+            className="whitespace-nowrap text-[length:var(--type-1)] font-semibold leading-none tracking-normal"
           >
             {PHASE_LABEL[slot]}
           </h2>
 
           {shownOverhead && (
             <span
-              className="whitespace-nowrap px-2 py-0.5 text-[11px] font-semibold tracking-[0.2em]"
+              className="whitespace-nowrap rounded-full px-2 py-0.5 text-[length:var(--type-0)] font-semibold tracking-normal"
               // Inverted on the banner: red on gold is too low-contrast.
               style={{ background: style.fg, color: style.bg }}
             >
@@ -236,23 +235,23 @@ export function FlightBoard({
             </span>
           )}
           {squawk?.emergency && (
-            <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-on-alert">
+            <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
               {squawk.label.toUpperCase()}
             </span>
           )}
         </div>
       )}
 
-      <div className={`flex flex-col ${picked ? "gap-3.5 px-5 py-4" : "gap-2.5 px-4 py-3"}`}>
+      <div className={`flex flex-col px-5 py-5 ${picked ? "gap-3.5" : "gap-3"}`}>
         {/* Identity */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3
-              className={`${picked ? "text-[20px]" : "text-[17px]"} leading-[1.15] text-pretty break-words text-ink`}
+              className={`type-heading ${picked ? "text-[length:var(--type-3)]" : "text-[length:var(--type-2)]"} text-pretty break-words text-ink`}
             >
               {title}
             </h3>
-            <p className="mt-1 text-[12.5px] text-ink-dim">
+            <p className="mt-1 text-[length:var(--type-0)] text-ink-dim">
               {typeLine || "Aircraft type unavailable"}
             </p>
           </div>
@@ -282,7 +281,7 @@ export function FlightBoard({
         {picked && (shownOverhead || squawk?.emergency) && (
           <div className="flex flex-wrap gap-2">
             {shownOverhead && (
-              <span className="flex items-center gap-1.5 whitespace-nowrap border border-alert px-2 py-0.5 text-[11px] font-semibold tracking-[0.2em] text-alert">
+              <span className="flex items-center gap-1.5 whitespace-nowrap border border-alert px-2 py-0.5 text-[length:var(--type-0)] font-semibold tracking-normal text-alert">
                 {/* The dot pulses, not the words: pulsing text drops below
                     readable contrast on every beat. */}
                 <span
@@ -293,7 +292,7 @@ export function FlightBoard({
               </span>
             )}
             {squawk?.emergency && (
-              <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-on-alert">
+              <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
                 {squawk.label.toUpperCase()}
               </span>
             )}
@@ -319,14 +318,14 @@ export function FlightBoard({
               />
             </div>
             {picked && e?.staleRoute && (
-              <p className="mt-2 text-[12.5px] leading-snug text-ink-faint">
+              <p className="mt-2 text-[length:var(--type-0)] leading-snug text-ink-faint">
                 The route on file for this flight number ({e.staleRoute}) is
                 out of date, so only the Ottawa end is shown.
               </p>
             )}
           </div>
         ) : (
-          <p className="text-[12.5px] text-ink-faint">
+          <p className="text-[length:var(--type-0)] text-ink-faint">
             No route filed for this callsign.
           </p>
         )}
@@ -337,15 +336,15 @@ export function FlightBoard({
             <AircraftFacts icaoType={e?.icaoType} />
 
             {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
-            <p className="border-t border-line pt-2.5 text-[12px] leading-relaxed tracking-[0.04em] text-ink-faint">
-              <span className="mr-2 text-[11px] tracking-[0.18em]">LIVE</span>
+            <p className="border-t border-line pt-2.5 text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-faint">
+              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">LIVE</span>
               {numbers}
             </p>
           </>
         ) : (
           <>
-            <p className="text-[11.5px] leading-relaxed tracking-[0.04em] text-ink-faint">
-              <span className="mr-2 text-[10.5px] tracking-[0.18em]">LIVE</span>
+            <p className="text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-faint">
+              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">LIVE</span>
               {numbers}
             </p>
           </>
@@ -364,8 +363,8 @@ function Endpoint({
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-baseline gap-2">
-      <span className="text-[16px] leading-none text-ink">{code ?? "???"}</span>
-      <span className="truncate text-[12px] text-ink-dim">
+      <span className="text-[length:var(--type-1)] leading-none text-ink">{code ?? "???"}</span>
+      <span className="truncate text-[length:var(--type-0)] text-ink-dim">
         {city ?? "Unknown"}
       </span>
     </div>

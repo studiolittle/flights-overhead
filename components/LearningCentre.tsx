@@ -61,19 +61,19 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
     <section aria-labelledby={headingId} className="panel flex flex-col">
       <SectionHeader
         id={headingId}
-        title="LEARNING CENTRE"
+        title="Learning centre"
         icon={<GraduationCap size={18} weight="bold" />}
       />
 
-      <p className="px-5 pt-4 text-[13.5px] leading-relaxed text-ink-dim">
-        New to planes? Every number and code on the board, in plain language.
-        Open a topic to start.
+      <p className="px-5 pt-4 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
+        Select a plane on the radar or in the activity list. Its flight data
+        becomes the examples below. Open a topic to explore.
       </p>
       {flight && (
-        <p className="px-5 pt-2 text-[12.5px] leading-snug text-ink-faint">
+        <p className="px-5 pt-2 text-[length:var(--type-0)] leading-snug text-ink-faint">
           Highlighted tags are from{" "}
           <span className="text-accent-ink">{flightTitle(flight)}</span>, on
-          the board now.
+          the spotlight now.
         </p>
       )}
 

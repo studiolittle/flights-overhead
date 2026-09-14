@@ -20,12 +20,12 @@ export function LearnMore({ children }: { children: ReactNode }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`whitespace-nowrap text-[11px] uppercase tracking-[0.12em] text-accent-ink hover:underline ${FOCUS}`}
+        className={`whitespace-nowrap text-[length:var(--type-0)] uppercase tracking-normal text-accent-ink hover:underline ${FOCUS}`}
       >
         {open ? "Show less –" : "Learn more +"}
       </button>
       {open && (
-        <span className="mt-2 block border-l-2 border-line-strong pl-3 text-[13px] leading-relaxed text-ink-dim">
+        <span className="mt-2 block border-l-2 border-line-strong pl-3 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
           {children}
         </span>
       )}
@@ -56,12 +56,12 @@ export function FieldRow({
   return (
     <div className="border-t border-line py-3.5 first:border-t-0 first:pt-1">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-        <span className="text-[11.5px] tracking-[0.18em] text-ink-faint">
+        <span className="text-[length:var(--type-0)] tracking-normal text-ink-faint">
           {label}
         </span>
         {example && (
           <span
-            className={`border bg-surface-2 px-1.5 py-0.5 text-[11.5px] leading-tight tracking-[0.04em] ${
+            className={`border bg-surface-2 px-1.5 py-0.5 text-[length:var(--type-0)] leading-tight tracking-normal ${
               live ? "border-accent text-accent-ink" : "border-line text-ink-dim"
             }`}
           >
@@ -69,7 +69,7 @@ export function FieldRow({
           </span>
         )}
       </div>
-      <div className="mt-1.5 text-[13px] leading-relaxed text-ink-dim">
+      <div className="mt-1.5 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
         {blurb}
         <LearnMore>{more}</LearnMore>
       </div>
@@ -106,16 +106,16 @@ export function GlossarySection({
         className={`flex w-full items-center justify-between gap-4 py-3.5 text-left ${FOCUS}`}
       >
         <span className="min-w-0">
-          <span className="block text-[12.5px] tracking-[0.2em] text-ink">
+          <span className="block text-[length:var(--type-0)] tracking-normal text-ink">
             {title}
           </span>
-          <span className="mt-1 block text-[12.5px] leading-snug text-ink-faint">
+          <span className="mt-1 block text-[length:var(--type-0)] leading-snug text-ink-faint">
             {summary}
           </span>
         </span>
         <span
           aria-hidden="true"
-          className="shrink-0 text-[18px] leading-none text-accent-ink"
+          className="shrink-0 text-[length:var(--type-2)] leading-none text-accent-ink"
         >
           {open ? "–" : "+"}
         </span>

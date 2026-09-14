@@ -49,7 +49,7 @@ export function ThemeToggle() {
       aria-label={`Dark mode ${isDark ? "on" : "off"}`}
       title={`Switch to ${isDark ? "light" : "dark"} mode`}
       onClick={toggle}
-      className="relative grid h-[26px] w-[52px] shrink-0 grid-cols-2 items-center border border-line-strong bg-surface-2 px-[3px]"
+      className="relative grid h-[30px] w-[52px] shrink-0 grid-cols-2 items-center rounded-full border border-line-strong bg-surface-2 px-[3px] transition-colors hover:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-ink"
     >
       {/* Dim end markers; the knob covers the active one. */}
       <Sun
@@ -66,7 +66,7 @@ export function ThemeToggle() {
       {mounted && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute left-[3px] grid h-[18px] w-[18px] place-items-center bg-accent text-on-accent ${
+          className={`pointer-events-none absolute left-[3px] grid h-[18px] w-[18px] place-items-center rounded-full bg-accent text-on-accent ${
             animate ? "transition-transform duration-200 ease-out" : ""
           }`}
           style={{ transform: `translate(${isDark ? 26 : 0}px, -50%)`, top: "50%" }}

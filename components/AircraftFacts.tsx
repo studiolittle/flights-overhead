@@ -25,20 +25,20 @@ export function AircraftFacts({
 
   return (
     <div className="border-t border-line pt-3.5">
-      <p className="flex items-center gap-2 text-[11.5px] tracking-[0.2em] text-accent-ink">
+      <p className="flex items-center gap-2 text-[length:var(--type-0)] tracking-normal text-accent-ink">
         <Lightbulb size={14} weight="bold" className="shrink-0" />
         FUN FACTS · {f.name.toUpperCase()}
       </p>
-      <div className="mt-2.5 flex flex-col gap-2.5 text-[14px] leading-relaxed text-ink">
+      <div className="mt-2.5 flex flex-col gap-2.5 text-[length:var(--type-1)] leading-relaxed text-ink">
         <p>{f.fact1}</p>
         {f.fact2 && <p>{f.fact2}</p>}
       </div>
       {f.note && (
-        <p className="mt-2.5 border-l-2 border-accent pl-3 text-[12.5px] leading-relaxed text-ink-dim">
+        <p className="mt-2.5 border-l-2 border-accent pl-3 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
           {f.note}
         </p>
       )}
-      <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">{meta}</p>
+      <p className="mt-2.5 text-[length:var(--type-0)] leading-snug text-ink-faint">{meta}</p>
     </div>
   );
 }

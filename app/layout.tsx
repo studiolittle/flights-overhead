@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Space_Grotesk } from "next/font/google";
+import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 
@@ -13,7 +13,7 @@ const GA_ID =
     ? process.env.NEXT_PUBLIC_GA_ID || "G-KKW2HEXNQT"
     : null;
 
-const spaceGrotesk = Space_Grotesk({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
@@ -41,7 +41,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={spaceGrotesk.variable}
+      className={inter.variable}
     >
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />

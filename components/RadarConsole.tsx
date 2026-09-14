@@ -6,7 +6,8 @@ import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
 import { ConditionsPanel, RadarPanel } from "./AirportPanel";
-import { FlightBoard, type BoardSlot } from "./FlightBoard";
+import type { BoardSlot } from "./FlightBoard";
+import { flightTitle } from "@/lib/aircraft";
 import { FunFactsSpot } from "./FunFactsSpot";
 import { LearningCentre } from "./LearningCentre";
 import { StatusBar } from "./StatusBar";
@@ -195,7 +196,7 @@ export function RadarConsole() {
    * The flight the Learning Centre's tags describe: the one you picked, else
    * the next arrival, else the latest departure.
    */
-  const focus = selected ?? arriving ?? departing;
+  const focus = selected ?? arriving ?? departing ?? live[0] ?? null;
 
   // --- actions --------------------------------------------------------------
   const toggleSelect = useCallback((id: string) => {
@@ -205,62 +206,52 @@ export function RadarConsole() {
   const clearSelection = useCallback(() => setSelectedId(null), []);
 
   const loading = !data && !fetchError;
-  const code = HOME_AIRPORT.iata;
 
-  /**
-   * One side of the board: always the flight nearest the airport, whatever
-   * you have tapped. Its fun facts open in place, like an accordion.
-   */
-  const boardFor = (slot: BoardSlot, lead: Contact | null) => (
-    <FlightBoard
-      slot={slot}
-      contact={lead}
-      overhead={lead?.overhead ?? false}
-      emptyText={
-        loading
-          ? `Scanning the sky around ${code}…`
-          : slot === "arriving"
-            ? `Nothing landing at ${code} right now. Crack a beer, there's always another one on the way in.`
-            : `Nothing taking off from ${code} right now. Keep an eye on the runway.`
-      }
-    />
-  );
 
   return (
-    <main className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-4 p-4 md:p-6">
-      <header className="flex items-center justify-between gap-4">
+    <main className="mx-auto flex min-h-[100dvh] max-w-[1440px] flex-col gap-6 p-4 md:p-8">
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-6">
         <div className="flex items-center gap-3.5">
-          <Broadcast size={26} weight="bold" className="text-accent-ink" />
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
+            <Broadcast size={24} weight="bold" />
+          </span>
           <div className="flex flex-col gap-0.5">
-            <h1 className="text-[19px] leading-none tracking-[0.3em] text-ink">
-              FLIGHTS OVERHEAD
+            <h1 className="type-heading text-[length:var(--type-3)] text-ink">
+              Flights Overhead
             </h1>
-            <span className="text-[12px] tracking-[0.14em] text-ink-dim">
-              Built by Jesse Little
+            <span className="text-[length:var(--type-0)] tracking-normal text-ink-dim">
+              Ottawa International · YOW
             </span>
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden text-[12.5px] tracking-[0.2em] text-ink-dim sm:block">
-            LIVE ADS-B · ADSB.LOL + ADSBDB
+          <span className="hidden rounded-full border border-line bg-surface px-3 py-1.5 text-[length:var(--type-0)] font-medium text-ink-dim sm:block">
+            Live flight dashboard
           </span>
           <ThemeToggle />
         </div>
       </header>
 
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <span className="text-[length:var(--type-small)] text-ink-dim">
+          <span className="font-semibold text-ink">{mounted && data ? live.length : "—"}</span> aircraft nearby
+          <span className="mx-2 text-ink-faint">·</span>{effectiveRange} km range
+        </span>
+      </div>
+
       {/* On phones the welcome drops to the bottom, just above the footer,
           so the radar is the first thing on screen. */}
-      <div className="panel order-1 flex items-start gap-3 px-5 py-4 lg:order-none">
+      <div className="panel order-1 flex items-start gap-3 px-5 py-4">
         <BeerStein
           size={20}
           weight="bold"
           className="mt-0.5 shrink-0 text-accent-ink"
         />
         <div>
-          <h2 className="text-[13.5px] tracking-[0.14em] text-ink">
-            WELCOME
+          <h2 className="type-heading text-[length:var(--type-1)] text-ink">
+            Welcome
           </h2>
-          <p className="mt-1.5 text-[13.5px] leading-relaxed text-ink-dim">
+          <p className="mt-1.5 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
             I built this app for fun and to learn more about the airplanes
             flying over my head while in my backyard enjoying a beer (or 12).
             I really hope you enjoy it. Crack open a beer and learn something
@@ -270,67 +261,52 @@ export function RadarConsole() {
         </div>
       </div>
 
+      <div id="dashboard-panel" className="min-w-0">
       {!mounted ? (
-        <div className="panel flex flex-1 items-center justify-center p-8 text-[15px] tracking-[0.2em] text-ink-dim">
-          INITIALISING
-        </div>
+        <div className="panel p-8 text-ink-dim">Scanning the sky…</div>
       ) : (
-        <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:items-start">
-          {/* Every block is a named section. Desktop, two columns:
-                left:  YOW Radar, Airport Conditions, Learning Centre
-                right: Now Arriving, Now Departing, Fun Facts
-              Phones stack them in the order people use them: YOW Radar,
-              Fun Facts, Airport Conditions, Now Arriving, Now Departing,
-              Learning Centre. The column wrappers are display:contents
-              below desktop, so `order` can interleave their children.
-              min-w-0: grid and flex items default to min-width:auto and
-              would otherwise refuse to shrink below their longest text. */}
-
-          <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-            <div className="order-1 min-w-0 lg:order-none">
-              <RadarPanel
-                contacts={reckoned}
-                ready={data != null}
-                selectedId={selectedId}
-                onSelect={toggleSelect}
-                wind={airport.wind}
-                landing={airport.landing}
-                takeoff={airport.takeoff}
-              />
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
+          <div className="flex min-w-0 flex-col gap-6">
+            <div className="panel grid min-w-0 xl:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]">
+              <RadarPanel contacts={reckoned} ready={data != null} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} embedded />
+            <section className="min-w-0 border-t border-line p-5 xl:border-t-0 xl:border-l xl:p-4" aria-labelledby="activity-title">
+              <h2 id="activity-title" className="type-heading text-[length:var(--type-1)]">Arriving & departing</h2>
+              <p className="mt-1 text-[length:var(--type-small)] text-ink-dim">Select a flight to explore.</p>
+              <div className="mt-4 grid gap-6 md:grid-cols-2 xl:grid-cols-1">
+                {(["arriving", "departing"] as const).map((phase) => {
+                  const flights = live.filter((c) => c.phase === phase);
+                  return (
+                    <div key={phase}>
+                      <h3 className="mb-2 text-[length:var(--type-1)] font-semibold">{phase === "arriving" ? "Arriving" : "Departing"} <span className="text-ink-faint">· {flights.length}</span></h3>
+                      <div className="flex flex-col gap-1">
+                        {flights.map((flight) => (
+                          <button key={flight.id} type="button" aria-pressed={focus?.id === flight.id} onClick={() => setSelectedId(flight.id)}
+                            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2 py-2.5 text-left text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${focus?.id === flight.id ? "border-accent-ink bg-surface-2" : "border-transparent hover:bg-surface-2"}`}>
+                            <span className="min-w-0 break-words font-medium">{flightTitle(flight)}</span>
+                            <span className="shrink-0 text-ink-dim">{flight.distanceKm.toFixed(1)} km</span>
+                          </button>
+                        ))}
+                        {!flights.length && <p className="py-3 text-[length:var(--type-small)] text-ink-faint">{loading ? "Scanning for aircraft…" : "No aircraft right now."}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
             </div>
-            <div className="order-3 min-w-0 lg:order-none">
-              <ConditionsPanel
-                nowTs={nowTs || Date.now()}
-                weather={airport.weather}
-                weatherError={airport.weatherError}
-                landing={airport.landing}
-                takeoff={airport.takeoff}
-              />
-            </div>
-            <div className="order-6 min-w-0 lg:order-none">
-              <LearningCentre flight={focus} />
-            </div>
+            <ConditionsPanel nowTs={nowTs} weather={airport.weather} weatherError={airport.weatherError} landing={airport.landing} takeoff={airport.takeoff} />
           </div>
-
-          <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
-            <div className="order-4 min-w-0 lg:order-none">
-              {boardFor("arriving", arriving)}
+          <div className="flex min-w-0 flex-col gap-6">
+            <div>
+              <FunFactsSpot selected={selected} featured={arriving ?? departing ?? live[0] ?? null} onClear={clearSelection} />
             </div>
-            <div className="order-5 min-w-0 lg:order-none">
-              {boardFor("departing", departing)}
-            </div>
-            <div className="order-2 min-w-0 lg:order-none">
-              <FunFactsSpot
-                selected={selected}
-                featured={arriving ?? departing}
-                onClear={clearSelection}
-              />
-            </div>
+            <LearningCentre flight={focus} />
           </div>
         </div>
       )}
+      </div>
 
-      <footer className="order-2 mt-auto flex flex-col lg:order-none items-center gap-1.5 border-t border-line pt-4 text-center text-[12.5px] tracking-[0.14em] text-ink-faint">
+      <footer className="order-2 mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-6 text-center text-[length:var(--type-0)] tracking-normal text-ink-faint">
         {mounted && (
           <div className="mb-2">
             <StatusBar

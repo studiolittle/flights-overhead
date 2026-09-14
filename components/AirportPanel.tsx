@@ -163,6 +163,7 @@ export function RadarPanel({
   wind,
   landing,
   takeoff,
+  embedded = false,
 }: {
   /** Every YOW flight in the feed; the scope keeps the ones in its view. */
   contacts: Contact[];
@@ -174,18 +175,19 @@ export function RadarPanel({
   wind: Wind | null;
   landing: RunwayCall;
   takeoff: RunwayCall;
+  embedded?: boolean;
 }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="panel flex flex-col">
+    <section aria-labelledby={headingId} className={embedded ? "flex min-w-0 flex-col" : "panel flex min-w-0 flex-col"}>
       <SectionHeader
         id={headingId}
-        title={`${HOME_AIRPORT.iata} RADAR`}
-        aside="TAP A PLANE FOR FUN FACTS"
+        title={`${HOME_AIRPORT.iata} radar`}
+        aside="Select an aircraft to explore"
       />
 
       <div className="flex flex-col gap-4 p-4 md:p-5">
-        <div className="mx-auto w-full max-w-[420px]">
+        <div className="mx-auto w-full max-w-[460px] rounded-2xl border border-line bg-canvas p-2 sm:p-4">
           <AirportScope
             contacts={contacts}
             selectedId={selectedId}
@@ -224,13 +226,6 @@ export function ConditionsPanel({
   const headingId = useId();
   const wind = weather?.wind ?? null;
 
-  const observed = weather?.observedAt
-    ? new Date(weather.observedAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
-
   const conditions = [
     weather?.tempC != null ? `${weather.tempC}°C` : null,
     weather?.visibilitySm ? `Visibility ${weather.visibilitySm} SM` : null,
@@ -246,12 +241,12 @@ export function ConditionsPanel({
     <section aria-labelledby={headingId} className="panel flex flex-col">
       <SectionHeader
         id={headingId}
-        title="AIRPORT CONDITIONS"
-        aside={observed ? `METAR ${observed}` : "METAR --"}
+        title="Airport details"
+        aside={weather?.observedAt ? `Weather · ${minutesAgo(nowTs - weather.observedAt)}` : "Weather unavailable"}
       />
       <div className="px-5 py-4">
-          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 text-[12.5px] leading-snug text-ink-dim">
-            <InfoRow label="LANDING">
+          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 text-[length:var(--type-0)] leading-snug text-ink-dim">
+            <InfoRow label="LIKELY LANDING">
               <RunwayValue
                 icon={<AirplaneLanding size={13} weight="bold" />}
                 color={ARRIVAL_COLOR}
@@ -259,7 +254,7 @@ export function ConditionsPanel({
                 op="arrival"
               />
             </InfoRow>
-            <InfoRow label="TAKING OFF">
+            <InfoRow label="LIKELY DEPARTURE">
               <RunwayValue
                 icon={<AirplaneTakeoff size={13} weight="bold" />}
                 color={DEPART_COLOR}
@@ -286,13 +281,17 @@ export function ConditionsPanel({
                 </span>
               )}
             </InfoRow>
+          </dl>
+          <p className="mt-3 text-[length:var(--type-0)] text-ink-faint">Runway estimates are inferred from aircraft activity or wind, not official tower instructions.</p>
+          <div className="mt-4 border-t border-line pt-3">
+            <dl className="mt-3 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-[length:var(--type-small)] text-ink-dim">
             {conditions && <InfoRow label="WEATHER">{conditions}</InfoRow>}
             <InfoRow label="LOCAL TIME">
               <LocalTime nowTs={nowTs} />
             </InfoRow>
             {weather?.raw && (
               <InfoRow label="METAR">
-                <span className="break-words text-[11.5px] text-ink-faint">
+                <span className="break-words text-[length:var(--type-0)] text-ink-faint">
                   {/* The row label already says METAR. */}
                   {weather.raw.replace(/^METAR\s+/, "")}
                   {weather.observedAt
@@ -302,6 +301,7 @@ export function ConditionsPanel({
               </InfoRow>
             )}
           </dl>
+          </div>
       </div>
     </section>
   );
@@ -311,7 +311,7 @@ export function ConditionsPanel({
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
-      <dt className="text-[10.5px] tracking-[0.16em] text-ink-faint">
+      <dt className="text-[length:var(--type-0)] tracking-normal text-ink-faint">
         {label}
       </dt>
       <dd className="min-w-0">{children}</dd>
@@ -342,10 +342,13 @@ function RunwayValue({
   return (
     <span className="flex flex-wrap items-center gap-x-1.5">
       <span style={{ color }}>{icon}</span>
-      <span style={{ color: call.ident ? color : "var(--color-ink-faint)" }}>
-        {call.ident ? `RWY ${call.ident}` : "--"}
+      <span className="text-[length:var(--type-3)] font-semibold" style={{ color: call.ident ? color : "var(--color-ink-faint)" }}>
+        {call.ident ? `RWY ${call.ident}` : "Undetermined"}
       </span>
       {where && <span className="text-ink-faint">{where}</span>}
+      <span className="rounded-full bg-surface-2 px-2 py-1 text-[length:var(--type-0)] text-ink-dim">
+        {call.source === "seen" ? "Observed activity" : call.source === "wind" ? "Wind estimate" : "Insufficient evidence"}
+      </span>
     </span>
   );
 }
@@ -370,7 +373,7 @@ function LocalTime({ nowTs }: { nowTs: number }) {
 
 function Legend() {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11.5px] tracking-[0.14em] text-ink-faint">
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[length:var(--type-0)] tracking-normal text-ink-faint">
       <span className="flex items-center gap-1.5">
         <span
           className="inline-block size-2 rounded-full"
@@ -548,7 +551,7 @@ function RunwayLabel({
       x={p.x}
       y={p.y}
       fill={color}
-      fontSize={23}
+      fontSize="var(--type-4)"
       textAnchor="middle"
       dominantBaseline="middle"
     >
@@ -573,9 +576,9 @@ function WindInset({ fromDeg, speedKt }: { fromDeg: number; speedKt: number }) {
         x={cx}
         y={36}
         fill="var(--color-ink-dim)"
-        fontSize={21}
+        fontSize="var(--type-3)"
         textAnchor="middle"
-        style={{ letterSpacing: "2px" }}
+        style={{ letterSpacing: "0" }}
       >
         WIND
       </text>
@@ -604,9 +607,9 @@ function WindInset({ fromDeg, speedKt }: { fromDeg: number; speedKt: number }) {
         x={cx}
         y={cy + half + 38}
         fill="var(--color-ink)"
-        fontSize={22}
+        fontSize="var(--type-3)"
         textAnchor="middle"
-        style={{ letterSpacing: "1px" }}
+        style={{ letterSpacing: "0" }}
       >
         {speedKt} KT
       </text>

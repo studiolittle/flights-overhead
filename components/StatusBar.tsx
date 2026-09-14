@@ -27,7 +27,7 @@ export function StatusBar({
   const age = snapshotAt ? ageLabel(nowTs - snapshotAt) : "--";
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[11.5px] tracking-[0.12em] text-ink-faint">
+    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[length:var(--type-0)] tracking-normal text-ink-faint">
       <span className="flex items-center gap-1.5 text-ink-dim">
         <Broadcast
           size={12}

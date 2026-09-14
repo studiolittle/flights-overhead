@@ -84,9 +84,11 @@ On Windows PowerShell, chain with `;` rather than `&&`.
 Open <http://localhost:3000>. The radar is centred on YOW and needs no API keys
 or local configuration.
 
-Typography is [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk),
-self-hosted via `next/font`, with tabular figures so the live readouts do not
-jitter as they update.
+Typography uses [Inter](https://fonts.google.com/specimen/Inter) throughout,
+self-hosted via `next/font`. Compact 14px semibold panel headings, 16–20px
+aircraft titles, and 13–14px body copy establish the dashboard hierarchy.
+Captions start at 12px. Headings use subtly negative tracking; live data
+uses tabular figures and normal tracking for easy scanning.
 
 ## Configuration
 
