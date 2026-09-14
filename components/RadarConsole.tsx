@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BeerStein, Broadcast } from "@phosphor-icons/react/dist/ssr";
+import { Broadcast, AirplaneLanding, AirplaneTakeoff } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
@@ -12,6 +12,7 @@ import { FunFactsSpot } from "./FunFactsSpot";
 import { LearningCentre } from "./LearningCentre";
 import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
+import { ViewerCount } from "./ViewerCount";
 import { useAirportConditions } from "./useAirportConditions";
 
 /**
@@ -44,6 +45,12 @@ export function RadarConsole() {
   const [nowTs, setNowTs] = useState(0);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "learning">("dashboard");
+
+  const openLearning = () => {
+    setActiveTab("learning");
+    document.getElementById("learning-tab")?.focus();
+  };
 
   const pollAbort = useRef<AbortController | null>(null);
 
@@ -225,7 +232,7 @@ export function RadarConsole() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden rounded-full border border-line bg-surface px-3 py-1.5 text-[length:var(--type-0)] font-medium text-ink-dim sm:block">
+          <span className="hidden text-[length:var(--type-0)] font-medium text-ink-dim sm:block">
             Live flight dashboard
           </span>
           <ThemeToggle />
@@ -233,35 +240,37 @@ export function RadarConsole() {
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-4">
+        <div role="tablist" aria-label="Dashboard sections" className="flex gap-6">
+          {(["dashboard", "learning"] as const).map((tab) => (
+            <button
+              key={tab}
+              id={`${tab}-tab`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              aria-controls={`${tab}-panel`}
+              tabIndex={activeTab === tab ? 0 : -1}
+              onClick={() => setActiveTab(tab)}
+              onKeyDown={(event) => {
+                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === "Home" ? "dashboard" : event.key === "End" ? "learning" : tab === "dashboard" ? "learning" : "dashboard";
+                setActiveTab(next);
+                document.getElementById(`${next}-tab`)?.focus();
+              }}
+              className={`border-b-2 py-3 text-[length:var(--type-0)] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${activeTab === tab ? "border-accent-ink text-ink" : "border-transparent text-ink-dim hover:text-ink"}`}
+            >
+              {tab === "dashboard" ? "Dashboard" : "Learning centre"}
+            </button>
+          ))}
+        </div>
         <span className="text-[length:var(--type-small)] text-ink-dim">
           <span className="font-semibold text-ink">{mounted && data ? live.length : "—"}</span> aircraft nearby
           <span className="mx-2 text-ink-faint">·</span>{effectiveRange} km range
         </span>
       </div>
 
-      {/* On phones the welcome drops to the bottom, just above the footer,
-          so the radar is the first thing on screen. */}
-      <div className="panel order-1 flex items-start gap-3 px-5 py-4">
-        <BeerStein
-          size={20}
-          weight="bold"
-          className="mt-0.5 shrink-0 text-accent-ink"
-        />
-        <div>
-          <h2 className="type-heading text-[length:var(--type-1)] text-ink">
-            Welcome
-          </h2>
-          <p className="mt-1.5 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
-            I built this app for fun and to learn more about the airplanes
-            flying over my head while in my backyard enjoying a beer (or 12).
-            I really hope you enjoy it. Crack open a beer and learn something
-            about aviation.{" "}
-            <span className="text-ink-faint">&mdash; Jesse</span>
-          </p>
-        </div>
-      </div>
-
-      <div id="dashboard-panel" className="min-w-0">
+      <div id="dashboard-panel" role="tabpanel" aria-labelledby="dashboard-tab" tabIndex={0} hidden={activeTab !== "dashboard"} className="min-w-0">
       {!mounted ? (
         <div className="panel p-8 text-ink-dim">Scanning the sky…</div>
       ) : (
@@ -276,12 +285,16 @@ export function RadarConsole() {
                 {(["arriving", "departing"] as const).map((phase) => {
                   const flights = live.filter((c) => c.phase === phase);
                   return (
-                    <div key={phase}>
-                      <h3 className="mb-2 text-[length:var(--type-1)] font-semibold">{phase === "arriving" ? "Arriving" : "Departing"} <span className="text-ink-faint">· {flights.length}</span></h3>
-                      <div className="flex flex-col gap-1">
+                    <div key={phase} className={`overflow-hidden rounded-xl border ${phase === "arriving" ? "border-accent-ink/25 bg-accent/10" : "border-depart/25 bg-depart/5"}`}>
+                      <h3 className={`flex items-center gap-2 px-3 py-3 text-[length:var(--type-1)] font-semibold ${phase === "arriving" ? "bg-accent/25 text-accent-ink" : "bg-depart/15 text-depart"}`}>
+                        {phase === "arriving" ? <AirplaneLanding size={20} weight="bold" aria-hidden="true" /> : <AirplaneTakeoff size={20} weight="bold" aria-hidden="true" />}
+                        {phase === "arriving" ? "Arriving" : "Departing"}
+                        <span className={`ml-auto min-w-6 rounded-md px-1.5 py-0.5 text-center text-[length:var(--type-small)] tabular-nums ${phase === "arriving" ? "bg-accent text-on-accent" : "bg-depart text-on-depart"}`}>{flights.length}</span>
+                      </h3>
+                      <div className="flex flex-col gap-1 p-2">
                         {flights.map((flight) => (
                           <button key={flight.id} type="button" aria-pressed={focus?.id === flight.id} onClick={() => setSelectedId(flight.id)}
-                            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2 py-2.5 text-left text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${focus?.id === flight.id ? "border-accent-ink bg-surface-2" : "border-transparent hover:bg-surface-2"}`}>
+                            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2 py-2.5 text-left text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${focus?.id === flight.id ? phase === "arriving" ? "border-accent-ink bg-accent/25" : "border-depart bg-depart/15" : phase === "arriving" ? "border-transparent hover:bg-accent/15" : "border-transparent hover:bg-depart/10"}`}>
                             <span className="min-w-0 break-words font-medium">{flightTitle(flight)}</span>
                             <span className="shrink-0 text-ink-dim">{flight.distanceKm.toFixed(1)} km</span>
                           </button>
@@ -300,10 +313,22 @@ export function RadarConsole() {
             <div>
               <FunFactsSpot selected={selected} featured={arriving ?? departing ?? live[0] ?? null} onClear={clearSelection} />
             </div>
-            <LearningCentre flight={focus} />
+            <section className="panel p-5" aria-labelledby="learning-preview-title">
+              <h2 id="learning-preview-title" className="type-heading text-[length:var(--type-1)] text-ink">Curious about what you’re seeing?</h2>
+              <p className="mt-2 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
+                Explore flight codes, aircraft and aviation terms—with examples from the plane in your spotlight.
+              </p>
+              <button type="button" onClick={openLearning} className="mt-3 text-[length:var(--type-0)] font-medium text-accent-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-accent-ink">
+                Explore the learning centre <span aria-hidden="true">→</span>
+              </button>
+            </section>
           </div>
         </div>
       )}
+      </div>
+
+      <div id="learning-panel" role="tabpanel" aria-labelledby="learning-tab" tabIndex={0} hidden={activeTab !== "learning"} className="mx-auto w-full max-w-4xl min-w-0">
+        <LearningCentre flight={focus} />
       </div>
 
       <footer className="order-2 mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-6 text-center text-[length:var(--type-0)] tracking-normal text-ink-faint">
@@ -323,12 +348,18 @@ export function RadarConsole() {
           </div>
         )}
         <span>For fun. Enjoy :)</span>
-        <a
-          href="mailto:info@studiolittle.ca"
-          className="text-ink-dim transition-colors hover:text-accent-ink"
-        >
-          info@studiolittle.ca
-        </a>
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <span>Built by Jesse Little</span>
+          <a
+            href="mailto:info@studiolittle.ca"
+            className="text-ink-dim transition-colors hover:text-accent-ink"
+          >
+            info@studiolittle.ca
+          </a>
+        </div>
+        <div className="mt-2 self-end">
+          <ViewerCount active={activeTab === "dashboard"} />
+        </div>
       </footer>
     </main>
   );

@@ -15,8 +15,7 @@
 /* ------------------------------------------------------------------ *
  *  Design tokens
  *
- *  The palette is built on one accent (#ffd351) over a dark green-black
- *  ground (#192221), with a full light counterpart. The raw `--c-*`
+ *  Sunlit ivory and gold pair with moonlit navy and ice blue. The raw `--c-*`
  *  values swap on `[data-theme]`; `@theme inline` re-exports them as
  *  Tailwind colour utilities (bg-canvas, text-ink, border-line, ...)
  *  that follow the swap because `inline` makes the utilities reference
@@ -29,31 +28,31 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --c-canvas: #f3f5f1;
-  --c-surface: #ffffff;
-  --c-surface-2: #eef1ec;
-  --c-line: #dde3dc;
-  --c-line-strong: #c2cdc5;
-  --c-ink: #18211f;
-  --c-ink-dim: #4f5b54;
+  --c-canvas: #fff8e9;
+  --c-surface: #fffdf7;
+  --c-surface-2: #f8efd9;
+  --c-line: #e9ddc3;
+  --c-line-strong: #cdbc99;
+  --c-ink: #302b22;
+  --c-ink-dim: #645944;
   /* The quietest text tier still carries information (live numbers, row
      labels, the legend), so it holds 4.5:1 on every surface it sits on,
      the tinted board cards included. Same rule in dark. */
-  --c-ink-faint: #657068;
+  --c-ink-faint: #75684f;
 
-  --c-accent: #ffd351; /* brand fill: buttons, dots, sweep */
-  --c-accent-ink: #7a5f00; /* dark gold: readable accent text/strokes/icons */
-  --c-on-accent: #192221; /* text on an accent fill */
+  --c-accent: #ffcf48; /* sunshine fill: buttons, dots, sweep */
+  --c-accent-ink: #795500; /* readable gold text/strokes/icons */
+  --c-on-accent: #302b22;
 
-  --c-depart: #b4540f; /* departing state; 4.5:1 as text on the canvas */
+  --c-depart: #a34421; /* terracotta contrasts with sunny arrivals */
   --c-on-depart: #ffffff; /* text on a depart fill */
   --c-alert: #d33f3f; /* overhead / emergency */
   --c-on-alert: #ffffff; /* text on an alert fill */
 
-  --c-grid: rgb(30 41 38 / 0.14);
-  --c-sweep: 201 152 22; /* richer gold; #ffd351 at low alpha reads as beige */
+  --c-grid: rgb(121 85 0 / 0.14);
+  --c-sweep: 218 157 20;
   --c-glow: transparent;
-  --c-vignette: rgb(24 33 31 / 0.05);
+  --c-vignette: rgb(223 165 48 / 0.09);
 }
 
 /* Dark is the default: it also covers the no-script case, where nothing sets
@@ -62,30 +61,28 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --c-canvas: #192221;
-  --c-surface: #1f2b29;
-  --c-surface-2: #243230;
-  --c-line: #303f3b;
-  --c-line-strong: #43574f;
-  --c-ink: #e9efe9;
-  /* Faint had to rise to reach 4.5:1, so dim rises with it and the three
-     text tiers stay evenly spaced: about 12.5, 8.2 and 5.4:1 on a panel. */
-  --c-ink-dim: #bac5be;
-  --c-ink-faint: #93a098;
+  --c-canvas: #0b1426;
+  --c-surface: #121f36;
+  --c-surface-2: #1b2b46;
+  --c-line: #2a3b57;
+  --c-line-strong: #455d7e;
+  --c-ink: #eef4ff;
+  --c-ink-dim: #bfcee4;
+  --c-ink-faint: #a2b4cf;
 
-  --c-accent: #ffd351;
-  --c-accent-ink: #ffd351;
-  --c-on-accent: #192221;
+  --c-accent: #a8d8ff;
+  --c-accent-ink: #a8d8ff;
+  --c-on-accent: #0b1426;
 
-  --c-depart: #ff9d5c;
-  --c-on-depart: #192221;
-  --c-alert: #ff6b6b;
-  --c-on-alert: #192221;
+  --c-depart: #b9b1ff; /* periwinkle separates departures from ice-blue arrivals */
+  --c-on-depart: #0b1426;
+  --c-alert: #ff969f;
+  --c-on-alert: #0b1426;
 
-  --c-grid: rgb(255 211 81 / 0.11);
-  --c-sweep: 255 211 81;
-  --c-glow: rgb(255 211 81 / 0.42);
-  --c-vignette: rgb(0 0 0 / 0.45);
+  --c-grid: rgb(168 216 255 / 0.13);
+  --c-sweep: 168 216 255;
+  --c-glow: rgb(168 216 255 / 0.3);
+  --c-vignette: rgb(2 7 20 / 0.4);
 }
 
 @theme inline {
@@ -117,10 +114,24 @@
 
 html,
 body {
+  isolation: isolate;
   margin: 0;
   padding: 0;
   color: var(--c-ink);
 }
+
+.night-sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 88% 88%, #303b70 0%, transparent 40%),
+    linear-gradient(#050817, #161c4f);
+}
+
+.night-sky canvas { display: block; }
+:root[data-theme="light"] .night-sky { display: none; }
+:root:not([data-theme="light"]) body::after { display: none; }
 
 /* The canvas colour lives on <html> alone: a background on <body> would
    paint over the vignette below. */
