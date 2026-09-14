@@ -130,6 +130,54 @@ body {
 }
 
 .night-sky canvas { display: block; }
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--c-canvas);
+  color: var(--c-ink);
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+.app-loader-ready { opacity: 0; pointer-events: none; }
+.app-loader-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 8px;
+  border-radius: 20px;
+  background: var(--c-accent);
+  color: var(--c-on-accent);
+}
+.app-loader-track {
+  width: 120px;
+  height: 3px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--c-line);
+}
+.app-loader-track::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--c-accent-ink);
+  animation: loader-progress 1.4s ease-in-out infinite alternate;
+}
+@keyframes loader-progress { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) {
+  .app-loader { transition: none; }
+  .app-loader-track::after { animation: none; width: 100%; }
+}
 :root[data-theme="light"] .night-sky { display: none; }
 :root:not([data-theme="light"]) body::after { display: none; }
 

@@ -146,6 +146,7 @@ export function NightSky() {
           if (now - last >= 1000 / 24 || reduced.matches) {
             material.uniforms.time.value = reduced.matches ? 0 : now / 1000;
             renderer.render(scene, camera);
+            if (host.current) host.current.dataset.skyReady = "true";
             last = now;
           }
           if (!reduced.matches) frame = requestAnimationFrame(render);
@@ -181,6 +182,7 @@ export function NightSky() {
         };
       } catch {
         // The CSS gradient remains available when WebGL is unsupported.
+        if (host.current) host.current.dataset.skyReady = "true";
       } finally { loading = false; }
     }
     const observer = new MutationObserver(() => { void syncTheme(); });

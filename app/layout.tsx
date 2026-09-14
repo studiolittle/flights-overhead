@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { NightSky } from "@/components/NightSky";
+import { LoadingGate } from "@/components/LoadingGate";
 
 /**
  * Google Analytics 4 measurement ID. Public by design: every visitor's
@@ -47,7 +48,7 @@ export default function RootLayout({
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <NightSky />
-        {children}
+        <LoadingGate>{children}</LoadingGate>
       </body>
       {GA_ID && <GoogleAnalytics gaId={GA_ID} />}
     </html>
