@@ -24,15 +24,19 @@
   --c-line-strong: #c2cdc5;
   --c-ink: #18211f;
   --c-ink-dim: #4f5b54;
-  --c-ink-faint: #7e8a81;
+  /* The quietest text tier still carries information (live numbers, row
+     labels, the legend), so it holds 4.5:1 on every surface it sits on,
+     the tinted board cards included. Same rule in dark. */
+  --c-ink-faint: #657068;
 
   --c-accent: #ffd351; /* brand fill: buttons, dots, sweep */
   --c-accent-ink: #7a5f00; /* dark gold: readable accent text/strokes/icons */
   --c-on-accent: #192221; /* text on an accent fill */
 
-  --c-depart: #b8560f; /* departing state */
+  --c-depart: #b4540f; /* departing state; 4.5:1 as text on the canvas */
   --c-on-depart: #ffffff; /* text on a depart fill */
   --c-alert: #d33f3f; /* overhead / emergency */
+  --c-on-alert: #ffffff; /* text on an alert fill */
 
   --c-grid: rgb(30 41 38 / 0.14);
   --c-sweep: 201 152 22; /* richer gold; #ffd351 at low alpha reads as beige */
@@ -52,8 +56,10 @@
   --c-line: #303f3b;
   --c-line-strong: #43574f;
   --c-ink: #e9efe9;
-  --c-ink-dim: #9aa9a1;
-  --c-ink-faint: #63736b;
+  /* Faint had to rise to reach 4.5:1, so dim rises with it and the three
+     text tiers stay evenly spaced: about 12.5, 8.2 and 5.4:1 on a panel. */
+  --c-ink-dim: #bac5be;
+  --c-ink-faint: #93a098;
 
   --c-accent: #ffd351;
   --c-accent-ink: #ffd351;
@@ -62,6 +68,7 @@
   --c-depart: #ff9d5c;
   --c-on-depart: #192221;
   --c-alert: #ff6b6b;
+  --c-on-alert: #192221;
 
   --c-grid: rgb(255 211 81 / 0.11);
   --c-sweep: 255 211 81;
@@ -84,6 +91,7 @@
   --color-depart: var(--c-depart);
   --color-on-depart: var(--c-on-depart);
   --color-alert: var(--c-alert);
+  --color-on-alert: var(--c-on-alert);
   --color-grid: var(--c-grid);
 }
 
@@ -99,8 +107,14 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--c-canvas);
   color: var(--c-ink);
+}
+
+/* The canvas colour lives on <html> alone: a background on <body> would
+   paint over the vignette below. */
+html {
+  background: var(--c-canvas);
+  transition: background-color 200ms ease;
 }
 
 body {
@@ -113,16 +127,18 @@ body {
      Inherited, so SVG <text> in the radar picks it up too. */
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
-  transition: background-color 200ms ease, color 200ms ease;
+  transition: color 200ms ease;
 }
 
-/* Static vignette. Fixed + pointer-events:none, no scroll repaint cost. */
+/* Static vignette. Fixed + pointer-events:none, no scroll repaint cost.
+   Behind everything (z-index -1): it darkens the canvas around the panels,
+   never the text on them. */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 50;
+  z-index: -1;
   background: radial-gradient(
     ellipse at center,
     transparent 52%,
@@ -427,6 +443,7 @@ body::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html,
   body {
     transition: none;
   }

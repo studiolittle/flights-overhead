@@ -1,11 +1,13 @@
 "use client";
 
+import { useId } from "react";
 import { GraduationCap } from "@phosphor-icons/react/dist/ssr";
 import { categoryLabel, decodeCallsign, flightTitle } from "@/lib/aircraft";
 import { factsFor, firstYear } from "@/lib/facts";
 import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
 import type { Contact } from "@/lib/types";
 import { FieldRow, GlossarySection } from "./Explainer";
+import { SectionHeader } from "./SectionHeader";
 
 /** Tag values read off one flight; null wherever the feed has nothing. */
 function flightTags(c: Contact | null) {
@@ -54,14 +56,14 @@ function tag(live: string | null | undefined, stock: string) {
  */
 export function LearningCentre({ flight }: { flight: Contact | null }) {
   const t = flightTags(flight);
+  const headingId = useId();
   return (
-    <section className="panel flex flex-col">
-      <div className="flex items-center gap-2.5 border-b border-line px-5 py-3">
-        <GraduationCap size={18} weight="bold" className="text-accent-ink" />
-        <span className="text-[15px] tracking-[0.28em] text-ink">
-          LEARNING CENTRE
-        </span>
-      </div>
+    <section aria-labelledby={headingId} className="panel flex flex-col">
+      <SectionHeader
+        id={headingId}
+        title="LEARNING CENTRE"
+        icon={<GraduationCap size={18} weight="bold" />}
+      />
 
       <p className="px-5 pt-4 text-[13.5px] leading-relaxed text-ink-dim">
         New to planes? Every number and code on the board, in plain language.

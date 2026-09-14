@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { HandTap, Lightbulb } from "@phosphor-icons/react/dist/ssr";
 import { flightTitle } from "@/lib/aircraft";
 import { factsFor } from "@/lib/facts";
 import type { Contact } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
 import { FlightBoard } from "./FlightBoard";
+import { SectionHeader } from "./SectionHeader";
 
 /**
  * The Fun Facts section: the full card for the flight you tapped on the
@@ -24,6 +25,8 @@ export function FunFactsSpot({
   featured: Contact | null;
   onClear: () => void;
 }) {
+  const headingId = useId();
+
   // Bring a newly tapped flight's card into view if the tap left it partly
   // off screen.
   const ref = useRef<HTMLElement>(null);
@@ -47,16 +50,17 @@ export function FunFactsSpot({
       : null;
 
   return (
-    <section ref={ref} className="panel flex scroll-mt-4 flex-col">
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 border-b border-line px-5 py-3">
-        <Lightbulb size={18} weight="bold" className="text-accent-ink" />
-        <span className="text-[15px] tracking-[0.28em] text-ink">FUN FACTS</span>
-        {status && (
-          <span className="ml-auto text-[11.5px] tracking-[0.2em] text-ink-faint">
-            {status}
-          </span>
-        )}
-      </div>
+    <section
+      ref={ref}
+      aria-labelledby={headingId}
+      className="panel flex scroll-mt-4 flex-col"
+    >
+      <SectionHeader
+        id={headingId}
+        title="FUN FACTS"
+        icon={<Lightbulb size={18} weight="bold" />}
+        aside={status}
+      />
 
       {selected ? (
         <FlightBoard
@@ -69,9 +73,9 @@ export function FunFactsSpot({
         />
       ) : showFeatured ? (
         <div className="px-5 py-4">
-          <p className="text-[17px] leading-snug text-ink">
+          <h3 className="text-[17px] leading-snug text-ink">
             {flightTitle(featured)}
-          </p>
+          </h3>
           <div className="mt-3">
             <AircraftFacts icaoType={featured.enrichment?.icaoType} />
           </div>

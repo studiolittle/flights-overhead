@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
@@ -101,6 +101,8 @@ export function FlightBoard({
   const [swap, setSwap] = useState<"idle" | "leaving" | "entering">("idle");
   /** The flight id currently on screen — only this identity change animates. */
   const shownId = useRef<string | null>(contact?.id ?? null);
+  /** A board is a section named by its banner (NOW ARRIVING / NOW DEPARTING). */
+  const headingId = useId();
 
   useEffect(() => {
     const nextId = contact?.id ?? null;
@@ -134,15 +136,21 @@ export function FlightBoard({
 
   if (!shown) {
     return (
-      <div className={`panel board-swap ${swapClass} flex flex-col`}>
+      <section
+        aria-labelledby={headingId}
+        className={`panel board-swap ${swapClass} flex flex-col`}
+      >
         <div
           className="flex items-center gap-2.5 border-b border-line px-4 py-2.5"
           style={{ borderLeft: `4px solid ${style.ink}`, color: style.ink }}
         >
           <SlotIcon slot={slot} size={18} />
-          <span className="whitespace-nowrap text-[14px] leading-none tracking-[0.24em]">
+          <h2
+            id={headingId}
+            className="whitespace-nowrap text-[14px] leading-none tracking-[0.24em]"
+          >
             {PHASE_LABEL[slot]}
-          </span>
+          </h2>
         </div>
         <div className="flex items-center gap-3 px-4 py-4">
           <BeerStein size={20} weight="bold" className="shrink-0 text-accent-ink" />
@@ -150,7 +158,7 @@ export function FlightBoard({
             {emptyText}
           </p>
         </div>
-      </div>
+      </section>
     );
   }
 
@@ -183,8 +191,13 @@ export function FlightBoard({
     .filter(Boolean)
     .join(" · ");
 
+  // The picked card sits inside the Fun Facts section, so only a board is a
+  // section of its own.
+  const Root = picked ? "div" : "section";
+
   return (
-    <div
+    <Root
+      aria-labelledby={picked ? undefined : headingId}
       className={`${picked ? "" : "panel "}board-swap ${swapClass} flex flex-col`}
       // The picked card sits inside the Fun Facts section: no panel of its
       // own and no arriving/departing colours, so it never reads as another
@@ -206,9 +219,12 @@ export function FlightBoard({
           <span className={shownOverhead ? "pulse-soft" : undefined}>
             <SlotIcon slot={slot} size={18} />
           </span>
-          <span className="whitespace-nowrap text-[14px] font-semibold leading-none tracking-[0.2em]">
+          <h2
+            id={headingId}
+            className="whitespace-nowrap text-[14px] font-semibold leading-none tracking-[0.2em]"
+          >
             {PHASE_LABEL[slot]}
-          </span>
+          </h2>
 
           {shownOverhead && (
             <span
@@ -220,7 +236,7 @@ export function FlightBoard({
             </span>
           )}
           {squawk?.emergency && (
-            <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-canvas">
+            <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-on-alert">
               {squawk.label.toUpperCase()}
             </span>
           )}
@@ -231,11 +247,11 @@ export function FlightBoard({
         {/* Identity */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2
+            <h3
               className={`${picked ? "text-[20px]" : "text-[17px]"} leading-[1.15] text-pretty break-words text-ink`}
             >
               {title}
-            </h2>
+            </h3>
             <p className="mt-1 text-[12.5px] text-ink-dim">
               {typeLine || "Aircraft type unavailable"}
             </p>
@@ -266,12 +282,18 @@ export function FlightBoard({
         {picked && (shownOverhead || squawk?.emergency) && (
           <div className="flex flex-wrap gap-2">
             {shownOverhead && (
-              <span className="pulse-soft whitespace-nowrap border border-alert px-2 py-0.5 text-[11px] font-semibold tracking-[0.2em] text-alert">
+              <span className="flex items-center gap-1.5 whitespace-nowrap border border-alert px-2 py-0.5 text-[11px] font-semibold tracking-[0.2em] text-alert">
+                {/* The dot pulses, not the words: pulsing text drops below
+                    readable contrast on every beat. */}
+                <span
+                  aria-hidden="true"
+                  className="pulse-soft size-1.5 rounded-full bg-alert"
+                />
                 OVERHEAD NOW
               </span>
             )}
             {squawk?.emergency && (
-              <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-canvas">
+              <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[11px] tracking-[0.2em] text-on-alert">
                 {squawk.label.toUpperCase()}
               </span>
             )}
@@ -329,7 +351,7 @@ export function FlightBoard({
           </>
         )}
       </div>
-    </div>
+    </Root>
   );
 }
 

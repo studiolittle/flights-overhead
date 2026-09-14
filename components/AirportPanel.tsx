@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
@@ -18,6 +18,7 @@ import {
   ScopeFrame,
   polar,
 } from "./ScopeParts";
+import { SectionHeader } from "./SectionHeader";
 import { minutesAgo, type RunwayCall } from "./useAirportConditions";
 
 /**
@@ -150,20 +151,6 @@ function runwayHeading(ident: string): number | null {
   return Number.isFinite(n) ? n * 10 : null;
 }
 
-/** A section title bar, the same on every section of the page. */
-function SectionHeader({ title, aside }: { title: string; aside?: string }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
-      <span className="text-[15px] tracking-[0.28em] text-ink">{title}</span>
-      {aside && (
-        <span className="text-[11.5px] tracking-[0.2em] text-ink-faint">
-          {aside}
-        </span>
-      )}
-    </div>
-  );
-}
-
 /**
  * The YOW Radar section: every YOW flight within 50 km of the airport, with
  * the colour key. Tapping a plane opens it in Fun Facts.
@@ -188,9 +175,11 @@ export function RadarPanel({
   landing: RunwayCall;
   takeoff: RunwayCall;
 }) {
+  const headingId = useId();
   return (
-    <section className="panel flex flex-col">
+    <section aria-labelledby={headingId} className="panel flex flex-col">
       <SectionHeader
+        id={headingId}
         title={`${HOME_AIRPORT.iata} RADAR`}
         aside="TAP A PLANE FOR FUN FACTS"
       />
@@ -232,6 +221,7 @@ export function ConditionsPanel({
   landing: RunwayCall;
   takeoff: RunwayCall;
 }) {
+  const headingId = useId();
   const wind = weather?.wind ?? null;
 
   const observed = weather?.observedAt
@@ -253,8 +243,9 @@ export function ConditionsPanel({
     .join(" · ");
 
   return (
-    <section className="panel flex flex-col">
+    <section aria-labelledby={headingId} className="panel flex flex-col">
       <SectionHeader
+        id={headingId}
         title="AIRPORT CONDITIONS"
         aside={observed ? `METAR ${observed}` : "METAR --"}
       />
@@ -451,11 +442,13 @@ function AirportScope({
     wind && wind.dirDeg != null && wind.speedKt > 0 ? wind.dirDeg : null;
 
   return (
-    <div className="relative aspect-square w-full">
+    <div className="relative aspect-square w-full overflow-clip">
       {/* The sweep: a slow, faint beam going round so the radar reads as
           searching. Fitted inside the outer ring, and behind the aircraft
           (the svg is positioned and comes later), so blips stay on top and
-          tappable. */}
+          tappable. It is a rotating square, so the wrapper clips it: near
+          45° its corners would reach past the panel and widen the page on
+          phones. */}
       <div
         className="radar-sweep"
         style={{
