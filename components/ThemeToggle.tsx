@@ -54,16 +54,16 @@ export function ThemeToggle() {
       aria-label={`Dark mode ${isDark ? "on" : "off"}`}
       title={`Switch to ${isDark ? "light" : "dark"} mode`}
       onClick={toggle}
-      className="relative grid h-[30px] w-[52px] shrink-0 grid-cols-2 items-center rounded-full border border-line-strong bg-surface-2 px-[3px] transition-colors hover:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-ink"
+      className="relative grid h-[44px] w-[76px] shrink-0 grid-cols-2 items-center rounded-full border border-line-strong bg-surface-2 px-[5px] transition-colors hover:border-accent-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-ink"
     >
       {/* Dim end markers; the knob covers the active one. */}
       <Sun
-        size={13}
+        size={18}
         weight="bold"
         className="justify-self-center text-ink-faint"
       />
       <Moon
-        size={13}
+        size={18}
         weight="bold"
         className="justify-self-center text-ink-faint"
       />
@@ -71,15 +71,15 @@ export function ThemeToggle() {
       {mounted && (
         <span
           aria-hidden
-          className={`pointer-events-none absolute left-[3px] grid h-[18px] w-[18px] place-items-center rounded-full bg-accent text-on-accent ${
+          className={`pointer-events-none absolute left-[5px] grid h-[32px] w-[32px] place-items-center rounded-full bg-accent text-on-accent ${
             animate ? "transition-transform duration-200 ease-out" : ""
           }`}
-          style={{ transform: `translate(${isDark ? 26 : 0}px, -50%)`, top: "50%" }}
+          style={{ transform: `translate(${isDark ? 32 : 0}px, -50%)`, top: "50%" }}
         >
           {isDark ? (
-            <Moon size={12} weight="bold" />
+            <Moon size={18} weight="bold" />
           ) : (
-            <Sun size={12} weight="bold" />
+            <Sun size={18} weight="bold" />
           )}
         </span>
       )}

@@ -146,6 +146,7 @@ function runwayHeading(ident: string): number | null {
  * the colour key. Tapping a plane opens it in Fun Facts.
  */
 export function RadarPanel({
+  nowTs,
   contacts,
   ready,
   selectedId,
@@ -155,6 +156,7 @@ export function RadarPanel({
   takeoff,
   embedded = false,
 }: {
+  nowTs: number;
   /** Every YOW flight in the feed; the scope keeps the ones in its view. */
   contacts: Contact[];
   /** The first snapshot has arrived: what it holds counts as already detected. */
@@ -173,7 +175,7 @@ export function RadarPanel({
       <SectionHeader
         id={headingId}
         title={`${HOME_AIRPORT.iata} radar`}
-        aside="Select an aircraft to explore"
+        aside={<LocalTime nowTs={nowTs} />}
       />
 
       <div className="flex flex-col gap-4 p-4 md:p-5">
@@ -307,7 +309,7 @@ function RunwayValue({
   );
 }
 
-/** Airport-local time and date for the site header. */
+/** Airport-local time and date for the radar header. */
 export function LocalTime({ nowTs }: { nowTs: number }) {
   if (!nowTs) return <span className="text-ink-dim">Ottawa time · —</span>;
   const now = new Date(nowTs);

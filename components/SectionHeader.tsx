@@ -15,7 +15,7 @@ export function SectionHeader({
   title: string;
   /** Decorative: the title already says what the section is. */
   icon?: ReactNode;
-  aside?: string | null;
+  aside?: ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">

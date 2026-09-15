@@ -5,7 +5,7 @@ import { Broadcast, AirplaneLanding, AirplaneTakeoff } from "@phosphor-icons/rea
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
-import { ConditionsPanel, RadarPanel, LocalTime } from "./AirportPanel";
+import { ConditionsPanel, RadarPanel } from "./AirportPanel";
 import type { BoardSlot } from "./FlightBoard";
 import { flightTitle } from "@/lib/aircraft";
 import { FunFactsSpot } from "./FunFactsSpot";
@@ -217,8 +217,8 @@ export function RadarConsole() {
 
   return (
     <main data-dashboard-ready={mounted && Boolean(data || fetchError)} className="mx-auto flex min-h-[100dvh] max-w-[1440px] flex-col gap-6 p-4 md:p-8">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-6">
-        <div className="flex items-center gap-3.5">
+      <header className="flex items-start justify-between gap-4 border-b border-line pb-6">
+        <div className="flex min-w-0 items-center gap-3.5">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
             <Broadcast size={24} weight="bold" />
           </span>
@@ -231,8 +231,7 @@ export function RadarConsole() {
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-[length:var(--type-0)] font-medium text-ink-dim"><LocalTime nowTs={mounted ? nowTs : 0} /></div>
+        <div className="ml-auto shrink-0">
           <ThemeToggle />
         </div>
       </header>
@@ -275,7 +274,7 @@ export function RadarConsole() {
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <div className="flex min-w-0 flex-col gap-6">
             <div className="panel grid min-w-0 xl:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]">
-              <RadarPanel contacts={reckoned} ready={data != null} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} embedded />
+              <RadarPanel nowTs={nowTs} contacts={reckoned} ready={data != null} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} embedded />
             <section className="min-w-0 border-t border-line p-5 xl:border-t-0 xl:border-l xl:p-4" aria-labelledby="activity-title">
               <h2 id="activity-title" className="type-heading text-[length:var(--type-1)]">Arriving & departing</h2>
               <p className="mt-1 text-[length:var(--type-small)] text-ink-dim">Select a flight to explore.</p>
