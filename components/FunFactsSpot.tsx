@@ -54,7 +54,7 @@ export function FunFactsSpot({
       />
 
       {aircraft ? (
-        <FlightBoard variant="picked" slot={aircraft.phase === "departing" ? "departing" : "arriving"} contact={aircraft} overhead={aircraft.overhead ?? false} onClear={selected ? onClear : undefined} emptyText="" />
+        <FlightBoard variant="picked" slot={aircraft.phase === "departing" ? "departing" : "arriving"} contact={aircraft} onClear={selected ? onClear : undefined} emptyText="" />
       ) : (
         <p className="flex items-center gap-2.5 px-5 py-4 text-[length:var(--type-0)] leading-snug text-ink-dim">
           <HandTap size={20} weight="bold" className="shrink-0 text-accent-ink" />

@@ -10,7 +10,6 @@ import type { BoardSlot } from "./FlightBoard";
 import { flightTitle } from "@/lib/aircraft";
 import { FunFactsSpot } from "./FunFactsSpot";
 import { LearningCentre } from "./LearningCentre";
-import { StatusBar } from "./StatusBar";
 import { ThemeToggle } from "./ThemeToggle";
 import { ViewerCount } from "./ViewerCount";
 import { useAirportConditions } from "./useAirportConditions";
@@ -329,22 +328,6 @@ export function RadarConsole() {
       </div>
 
       <footer className="order-2 mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-6 text-center text-[length:var(--type-0)] tracking-normal text-ink-faint">
-        {mounted && (
-          <div className="mb-2">
-            <StatusBar
-              source={data?.source ?? "adsb.lol"}
-              snapshotAt={data?.updatedAt ?? null}
-              count={live.length}
-              rangeKm={effectiveRange}
-              home={home}
-              pollMs={POLL_MS}
-              stale={Boolean(data?.stale) || Boolean(fetchError)}
-              error={fetchError ?? data?.error ?? null}
-              nowTs={nowTs || Date.now()}
-            />
-          </div>
-        )}
-        <span>For fun. Enjoy :)</span>
         <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
           <span>Built by Jesse Little</span>
           <a

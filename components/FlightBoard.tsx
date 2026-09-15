@@ -78,14 +78,12 @@ const BOARD_SWAP_MS = 200;
 export function FlightBoard({
   slot,
   contact,
-  overhead,
   emptyText,
   variant = "board",
   onClear,
 }: {
   slot: BoardSlot;
   contact: Contact | null;
-  overhead: boolean;
   emptyText: string;
   variant?: "board" | "picked";
   /** picked: close the card. */
@@ -97,7 +95,6 @@ export function FlightBoard({
   // for the leave animation instead of vanishing the instant a new flight
   // takes over the board.
   const [shown, setShown] = useState(contact);
-  const [shownOverhead, setShownOverhead] = useState(overhead);
   const [swap, setSwap] = useState<"idle" | "leaving" | "entering">("idle");
   /** The flight id currently on screen — only this identity change animates. */
   const shownId = useRef<string | null>(contact?.id ?? null);
@@ -109,7 +106,6 @@ export function FlightBoard({
     if (nextId === shownId.current) {
       // Same flight (or still empty): just refresh the live numbers.
       setShown(contact);
-      setShownOverhead(overhead);
       return;
     }
     // A different flight (or the empty state) is taking over the board:
@@ -118,7 +114,6 @@ export function FlightBoard({
     const timer = setTimeout(() => {
       shownId.current = nextId;
       setShown(contact);
-      setShownOverhead(overhead);
       setSwap("entering");
       // Paint the entering (offset, transparent) state once before flipping
       // to idle, so the browser has something to transition away from.
@@ -127,7 +122,7 @@ export function FlightBoard({
       });
     }, BOARD_SWAP_MS);
     return () => clearTimeout(timer);
-  }, [contact, overhead]);
+  }, [contact]);
 
   const swapClass =
     swap === "leaving" ? "board-leave" : swap === "entering" ? "board-enter" : "";
@@ -215,7 +210,7 @@ export function FlightBoard({
           className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-t-2xl border-b border-line px-5 py-4"
           style={{ background: `color-mix(in srgb, ${style.bg} 8%, var(--color-surface))`, color: style.ink }}
         >
-          <span className={shownOverhead ? "pulse-soft" : undefined}>
+          <span>
             <SlotIcon slot={slot} size={18} />
           </span>
           <h2
@@ -225,15 +220,6 @@ export function FlightBoard({
             {PHASE_LABEL[slot]}
           </h2>
 
-          {shownOverhead && (
-            <span
-              className="whitespace-nowrap rounded-full px-2 py-0.5 text-[length:var(--type-0)] font-semibold tracking-normal"
-              // Inverted on the banner: red on gold is too low-contrast.
-              style={{ background: style.fg, color: style.bg }}
-            >
-              OVERHEAD NOW
-            </span>
-          )}
           {squawk?.emergency && (
             <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
               {squawk.label.toUpperCase()}
@@ -278,19 +264,8 @@ export function FlightBoard({
         </div>
 
         {/* Picked card: what the board banner would have flagged. */}
-        {picked && (shownOverhead || squawk?.emergency) && (
+        {picked && squawk?.emergency && (
           <div className="flex flex-wrap gap-2">
-            {shownOverhead && (
-              <span className="flex items-center gap-1.5 whitespace-nowrap border border-alert px-2 py-0.5 text-[length:var(--type-0)] font-semibold tracking-normal text-alert">
-                {/* The dot pulses, not the words: pulsing text drops below
-                    readable contrast on every beat. */}
-                <span
-                  aria-hidden="true"
-                  className="pulse-soft size-1.5 rounded-full bg-alert"
-                />
-                OVERHEAD NOW
-              </span>
-            )}
             {squawk?.emergency && (
               <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
                 {squawk.label.toUpperCase()}

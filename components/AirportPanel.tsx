@@ -192,6 +192,7 @@ export function RadarPanel({
           />
         </div>
         <Legend />
+        <a href="https://adsb.lol" target="_blank" rel="noopener noreferrer" className="self-end text-[length:var(--type-0)] text-ink-faint underline-offset-4 hover:underline">Flight data by adsb.lol</a>
       </div>
     </section>
   );
@@ -472,7 +473,6 @@ function AirportScope({
 
         {shown.map(({ c, d, b }) => {
           const p = polar(C, C, d * scale, b);
-          const overhead = c.overhead === true;
           return (
             <Blip
               key={c.id}
@@ -480,9 +480,9 @@ function AirportScope({
               x={p.x}
               y={p.y}
               distanceKm={d}
-              color={overhead ? "var(--color-alert)" : PHASE_COLOR[c.phase]}
+              color={PHASE_COLOR[c.phase]}
               selected={c.id === selectedId}
-              pulse={overhead}
+              pulse={false}
               fresh={sweep.isFresh(c.id)}
               onSelect={onSelect}
             />
