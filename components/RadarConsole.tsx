@@ -5,7 +5,7 @@ import { Broadcast, AirplaneLanding, AirplaneTakeoff } from "@phosphor-icons/rea
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
-import { ConditionsPanel, RadarPanel } from "./AirportPanel";
+import { ConditionsPanel, RadarPanel, LocalTime } from "./AirportPanel";
 import type { BoardSlot } from "./FlightBoard";
 import { flightTitle } from "@/lib/aircraft";
 import { FunFactsSpot } from "./FunFactsSpot";
@@ -232,9 +232,7 @@ export function RadarConsole() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="hidden text-[length:var(--type-0)] font-medium text-ink-dim sm:block">
-            Live flight dashboard
-          </span>
+          <div className="text-[length:var(--type-0)] font-medium text-ink-dim"><LocalTime nowTs={mounted ? nowTs : 0} /></div>
           <ThemeToggle />
         </div>
       </header>
@@ -307,7 +305,7 @@ export function RadarConsole() {
               </div>
             </section>
             </div>
-            <ConditionsPanel nowTs={nowTs} weather={airport.weather} weatherError={airport.weatherError} landing={airport.landing} takeoff={airport.takeoff} />
+            <ConditionsPanel nowTs={nowTs} weather={airport.weather} landing={airport.landing} takeoff={airport.takeoff} />
           </div>
           <div className="flex min-w-0 flex-col gap-6">
             <div>

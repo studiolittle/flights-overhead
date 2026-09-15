@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "@phosphor-icons/react/dist/ssr";
 
 type Theme = "light" | "dark";
-
-const KEY = "fo.theme";
 
 function currentTheme(): Theme {
   if (typeof document === "undefined") return "dark";
@@ -13,6 +11,7 @@ function currentTheme(): Theme {
 }
 
 export function ThemeToggle() {
+  const manual = useRef(false);
   // The blocking script in layout.tsx set data-theme before paint; mirror it
   // once mounted so the switch reflects reality and hydration stays clean.
   const [theme, setTheme] = useState<Theme>("dark");
@@ -25,17 +24,23 @@ export function ThemeToggle() {
     // Enable the slide transition only after the knob has painted in place,
     // so it does not animate from the wrong side on first load.
     const id = requestAnimationFrame(() => setAnimate(true));
-    return () => cancelAnimationFrame(id);
+    const sync = () => {
+      if (manual.current) return;
+      const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "America/Toronto", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+      const next = hour >= 7 && hour < 19 ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      setTheme(next);
+    };
+    sync();
+    const timer = setInterval(sync, 30_000);
+    document.addEventListener("visibilitychange", sync);
+    return () => { cancelAnimationFrame(id); clearInterval(timer); document.removeEventListener("visibilitychange", sync); };
   }, []);
 
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem(KEY, next);
-    } catch {
-      // Private mode: the choice just will not persist.
-    }
+    manual.current = true;
     setTheme(next);
   }
 

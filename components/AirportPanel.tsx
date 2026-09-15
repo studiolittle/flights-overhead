@@ -132,16 +132,6 @@ function useSweepReveal(
   };
 }
 
-function windHeadline(w: Wind): string {
-  if (w.speedKt === 0) return "Calm";
-  const dir =
-    w.dirDeg == null
-      ? "Variable"
-      : `${String(Math.round(w.dirDeg)).padStart(3, "0")}°`;
-  const gust = w.gustKt ? `, gusts ${w.gustKt}` : "";
-  return `${dir} at ${w.speedKt} kt${gust}`;
-}
-
 /**
  * The compass heading a runway is named for: its number with the dropped
  * zero put back ("32" -> 320). Null for anything unparseable.
@@ -206,25 +196,22 @@ export function RadarPanel({
 }
 
 /**
- * The Airport Conditions section: the runways in use, wind, weather, local
- * time and the raw METAR, in one tidy left-aligned list. The weather and the
+ * The Airport Conditions section: the runways in use and weather,
+ * in one tidy left-aligned list. The weather and the
  * runway calls come from `useAirportConditions`.
  */
 export function ConditionsPanel({
   nowTs,
   weather,
-  weatherError,
   landing,
   takeoff,
 }: {
   nowTs: number;
   weather: WeatherResponse | null;
-  weatherError: string | null;
   landing: RunwayCall;
   takeoff: RunwayCall;
 }) {
   const headingId = useId();
-  const wind = weather?.wind ?? null;
 
   const conditions = [
     weather?.tempC != null ? `${weather.tempC}°C` : null,
@@ -262,44 +249,11 @@ export function ConditionsPanel({
                 op="departure"
               />
             </InfoRow>
-            <InfoRow label="WIND">
-              {wind ? (
-                <>
-                  {windHeadline(wind)}
-                  {wind.dirDeg != null && wind.speedKt > 0 && (
-                    <span className="text-ink-faint">
-                      {" "}
-                      · from the {compass16(wind.dirDeg)}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="text-ink-faint">
-                  {weatherError
-                    ? `Unavailable: ${weatherError}`
-                    : "Loading the latest METAR"}
-                </span>
-              )}
-            </InfoRow>
           </dl>
           <p className="mt-3 text-[length:var(--type-0)] text-ink-faint">Runway estimates are inferred from aircraft activity or wind, not official tower instructions.</p>
           <div className="mt-4 border-t border-line pt-3">
             <dl className="mt-3 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-[length:var(--type-small)] text-ink-dim">
             {conditions && <InfoRow label="WEATHER">{conditions}</InfoRow>}
-            <InfoRow label="LOCAL TIME">
-              <LocalTime nowTs={nowTs} />
-            </InfoRow>
-            {weather?.raw && (
-              <InfoRow label="METAR">
-                <span className="break-words text-[length:var(--type-0)] text-ink-faint">
-                  {/* The row label already says METAR. */}
-                  {weather.raw.replace(/^METAR\s+/, "")}
-                  {weather.observedAt
-                    ? ` · ${minutesAgo(nowTs - weather.observedAt)}`
-                    : ""}
-                </span>
-              </InfoRow>
-            )}
           </dl>
           </div>
       </div>
@@ -353,15 +307,17 @@ function RunwayValue({
   );
 }
 
-/** Local time and date, for the list under the radar. */
-function LocalTime({ nowTs }: { nowTs: number }) {
+/** Airport-local time and date for the site header. */
+export function LocalTime({ nowTs }: { nowTs: number }) {
+  if (!nowTs) return <span className="text-ink-dim">Ottawa time · —</span>;
   const now = new Date(nowTs);
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <span className="status-dot" aria-hidden="true" />
-      {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+      <span>Ottawa · {now.toLocaleTimeString("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit" })}</span>
       <span className="text-ink-faint">
-        {now.toLocaleDateString([], {
+        {now.toLocaleDateString("en-CA", {
+          timeZone: "America/Toronto",
           weekday: "short",
           month: "short",
           day: "numeric",
