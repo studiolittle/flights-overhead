@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
-/* Compact dashboard sizes. Keep captions at least 12px. */
+/* Readable dashboard sizes: 14px labels, 15px supporting text, 16px body. */
 :root {
-  --type-0: max(12px, 0.75rem);
-  --type-small: max(13px, 0.8125rem);
-  --type-1: max(14px, 0.875rem);
-  --type-2: max(16px, 1rem);
-  --type-3: max(20px, 1.25rem);
-  --type-4: max(24px, 1.5rem);
-  --type-5: max(30px, 1.875rem);
-  --type-6: max(36px, 2.25rem);
+  --type-0: max(14px, 0.875rem);
+  --type-small: max(15px, 0.9375rem);
+  --type-1: max(16px, 1rem);
+  --type-2: max(18px, 1.125rem);
+  --type-3: max(24px, 1.5rem);
+  --type-4: max(28px, 1.75rem);
+  --type-5: max(34px, 2.125rem);
+  --type-6: max(40px, 2.5rem);
 }
 
 /* ------------------------------------------------------------------ *
