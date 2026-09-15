@@ -131,6 +131,33 @@ body {
 
 .night-sky canvas { display: block; }
 
+.day-sky {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 12% 15%, #ffe9ae 0%, transparent 55%),
+    linear-gradient(155deg, #fff8e9 15%, #fff4dc 55%, #e6f0f5 100%);
+}
+:root[data-theme="light"] .day-sky { display: block; }
+:root[data-theme="light"] body::after { display: none; }
+.day-sky span {
+  position: absolute;
+  border-radius: 50%;
+  background: #c69a42;
+  box-shadow: 0 0 9px 3px rgb(255 215 115 / 0.25);
+  animation: sunlit-drift 30s ease-in-out infinite alternate;
+}
+@keyframes sunlit-drift {
+  from { transform: translate3d(0, 12px, 0); opacity: 0.12; }
+  to { transform: translate3d(16px, -20px, 0); opacity: 0.32; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .day-sky span { animation: none; opacity: 0.2; }
+}
+
 .app-loader {
   position: fixed;
   inset: 0;
