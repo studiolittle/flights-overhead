@@ -27,13 +27,6 @@ export const metadata: Metadata = {
     "An arrivals board for the aircraft passing over your house: what it is, and where it came from.",
 };
 
-/**
- * Resolves the theme to a concrete `data-theme` value before first paint:
- * Ottawa daytime is 07:00–19:00. Runs synchronously so there is no
- * flash of the wrong palette.
- */
-const themeInit = `(function(){try{var h=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'America/Toronto',hour:'2-digit',hourCycle:'h23'}).format(new Date()));document.documentElement.dataset.theme=(h>=7&&h<19)?'light':'dark';}catch(e){document.documentElement.dataset.theme='dark';}})();`;
-
 export default function RootLayout({
   children,
 }: {
@@ -46,7 +39,6 @@ export default function RootLayout({
       className={inter.variable}
     >
       <body>
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <NightSky />
         <LoadingGate>{children}</LoadingGate>
       </body>

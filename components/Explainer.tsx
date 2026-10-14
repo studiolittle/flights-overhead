@@ -20,12 +20,12 @@ export function LearnMore({ children }: { children: ReactNode }) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`whitespace-nowrap text-[length:var(--type-0)] uppercase tracking-normal text-accent-ink hover:underline ${FOCUS}`}
+        className={`inline-flex min-h-11 items-center whitespace-nowrap text-[length:var(--type-0)] font-medium text-accent-ink underline-offset-4 hover:underline ${FOCUS}`}
       >
-        {open ? "Show less –" : "Learn more +"}
+        {open ? "Show less" : "Learn more"}
       </button>
       {open && (
-        <span className="mt-2 block border-l-2 border-line-strong pl-3 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
+        <span className="mt-2 block rounded-lg bg-surface-2 px-3 py-2.5 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
           {children}
         </span>
       )}
@@ -106,10 +106,10 @@ export function GlossarySection({
         className={`flex w-full items-center justify-between gap-4 py-3.5 text-left ${FOCUS}`}
       >
         <span className="min-w-0">
-          <span className="block text-[length:var(--type-0)] tracking-normal text-ink">
+          <span className="block text-[length:var(--type-2)] font-semibold leading-tight text-ink">
             {title}
           </span>
-          <span className="mt-1 block text-[length:var(--type-0)] leading-snug text-ink-faint">
+          <span className="mt-1 block text-[length:var(--type-0)] leading-snug text-ink-dim">
             {summary}
           </span>
         </span>

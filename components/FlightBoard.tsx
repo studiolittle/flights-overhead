@@ -179,8 +179,9 @@ export function FlightBoard({
   const numbers = [
     shown.baroAltitudeM != null ? flightLevel(shown.baroAltitudeM) : null,
     kt != null ? `${Math.round(kt)} kt` : null,
-    absFpm && vs > 0.5 ? `climbing ${absFpm} fpm` : null,
-    absFpm && vs < -0.5 ? `descending ${absFpm} fpm` : null,
+    absFpm && vs > 1.5 ? `climbing ${absFpm} fpm` : null,
+    absFpm && vs < -1.5 ? `descending ${absFpm} fpm` : null,
+    absFpm && Math.abs(vs) <= 1.5 ? "level" : null,
     `${shown.distanceKm.toFixed(1)} km ${compass16(shown.bearingDeg)}`,
   ]
     .filter(Boolean)
@@ -311,15 +312,15 @@ export function FlightBoard({
             <AircraftFacts icaoType={e?.icaoType} />
 
             {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
-            <p className="border-t border-line pt-2.5 text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-faint">
-              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">LIVE</span>
+            <p className="border-t border-line pt-2.5 text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-dim">
+              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">Live</span>
               {numbers}
             </p>
           </>
         ) : (
           <>
-            <p className="text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-faint">
-              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">LIVE</span>
+            <p className="text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-dim">
+              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">Live</span>
               {numbers}
             </p>
           </>

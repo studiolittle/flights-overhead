@@ -1,16 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Broadcast, AirplaneLanding, AirplaneTakeoff } from "@phosphor-icons/react/dist/ssr";
+import { Broadcast, AirplaneLanding, AirplaneTakeoff, WarningCircle } from "@phosphor-icons/react/dist/ssr";
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
-import { ConditionsPanel, RadarPanel } from "./AirportPanel";
+import { ConditionsPanel, LocalTime, RadarPanel } from "./AirportPanel";
 import type { BoardSlot } from "./FlightBoard";
 import { flightTitle } from "@/lib/aircraft";
+import { ageLabel } from "@/lib/format";
 import { FunFactsSpot } from "./FunFactsSpot";
 import { LearningCentre } from "./LearningCentre";
-import { ThemeToggle } from "./ThemeToggle";
 import { ViewerCount } from "./ViewerCount";
 import { useAirportConditions } from "./useAirportConditions";
 
@@ -36,6 +36,9 @@ const MAX_DR_SECONDS = 20;
  * reach the radar shows.
  */
 const RANGE_KM = 50;
+
+/** A snapshot older than this no longer counts as live. */
+const STALE_MS = 45_000;
 
 export function RadarConsole() {
   const [mounted, setMounted] = useState(false);
@@ -213,10 +216,28 @@ export function RadarConsole() {
 
   const loading = !data && !fetchError;
 
+  // A snapshot older than this is not "live": say so instead of showing an
+  // empty or frozen sky as if it were current.
+  const ageMs = data ? Math.max(0, nowTs - data.updatedAt) : null;
+  const stale = ageMs != null && ageMs > STALE_MS;
+  const offline = fetchError != null || stale;
+
+  // Screen readers get the roster whenever who is in range changes, not on
+  // every one-second tick.
+  const rosterKey = live.map((c) => c.id).sort().join(",");
+  const roster = useMemo(
+    () =>
+      live.length
+        ? `${live.length} aircraft in range: ${live.map(flightTitle).join(", ")}.`
+        : "No aircraft in range.",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rosterKey],
+  );
 
   return (
-    <main data-dashboard-ready={mounted && Boolean(data || fetchError)} className="mx-auto flex min-h-[100dvh] max-w-[1440px] flex-col gap-6 p-4 md:p-8">
-      <header className="flex items-start justify-between gap-4 border-b border-line pb-6">
+    <main data-dashboard-ready={mounted && Boolean(data || fetchError)} className="mx-auto flex min-h-[100dvh] max-w-[1440px] flex-col gap-5 p-4 md:p-8">
+      <a href="#activity" className="skip-link">Skip to the flight list</a>
+      <header className="flex items-start justify-between gap-4 border-b border-line pb-5">
         <div className="flex min-w-0 items-center gap-3.5">
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
             <Broadcast size={24} weight="bold" />
@@ -230,116 +251,127 @@ export function RadarConsole() {
             </span>
           </div>
         </div>
-        <div className="ml-auto shrink-0">
-          <ThemeToggle />
-        </div>
       </header>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div role="tablist" aria-label="Dashboard sections" className="flex gap-6">
-          {(["dashboard", "learning"] as const).map((tab) => (
-            <button
-              key={tab}
-              id={`${tab}-tab`}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab}
-              aria-controls={`${tab}-panel`}
-              tabIndex={activeTab === tab ? 0 : -1}
-              onClick={() => setActiveTab(tab)}
-              onKeyDown={(event) => {
-                if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-                event.preventDefault();
-                const next = event.key === "Home" ? "dashboard" : event.key === "End" ? "learning" : tab === "dashboard" ? "learning" : "dashboard";
-                setActiveTab(next);
-                document.getElementById(`${next}-tab`)?.focus();
-              }}
-              className={`border-b-2 py-3 text-[length:var(--type-0)] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${activeTab === tab ? "border-accent-ink text-ink" : "border-transparent text-ink-dim hover:text-ink"}`}
-            >
-              {tab === "dashboard" ? "Dashboard" : "Learning centre"}
-            </button>
-          ))}
-        </div>
-        <span className="text-[length:var(--type-small)] text-ink-dim">
-          <span className="font-semibold text-ink">{mounted && data ? live.length : "—"}</span> aircraft nearby
-          <span className="mx-2 text-ink-faint">·</span>{effectiveRange} km range
-        </span>
+      <div role="tablist" aria-label="Dashboard sections" className="flex gap-6">
+        {(["dashboard", "learning"] as const).map((tab) => (
+          <button
+            key={tab}
+            id={`${tab}-tab`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`${tab}-panel`}
+            tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => setActiveTab(tab)}
+            onKeyDown={(event) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const next = event.key === "Home" ? "dashboard" : event.key === "End" ? "learning" : tab === "dashboard" ? "learning" : "dashboard";
+              setActiveTab(next);
+              document.getElementById(`${next}-tab`)?.focus();
+            }}
+            className={`min-h-11 border-b-2 py-2 text-[length:var(--type-0)] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${activeTab === tab ? "border-accent-ink text-ink" : "border-transparent text-ink-dim hover:text-ink"}`}
+          >
+            {tab === "dashboard" ? "Dashboard" : "Learning centre"}
+          </button>
+        ))}
       </div>
 
       <div id="dashboard-panel" role="tabpanel" aria-labelledby="dashboard-tab" tabIndex={0} hidden={activeTab !== "dashboard"} className="min-w-0">
+      <p className="sr-only" role="status" aria-live="polite">{mounted && data ? roster : ""}</p>
       {!mounted ? (
-        <div className="panel p-8 text-ink-dim">Scanning the sky…</div>
+        <p className="py-8 text-center text-ink-dim">Scanning the sky…</p>
       ) : (
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
-          <div className="flex min-w-0 flex-col gap-6">
-            <div className="panel grid min-w-0 xl:grid-cols-[minmax(0,2fr)_minmax(220px,1fr)]">
-              <RadarPanel nowTs={nowTs} contacts={reckoned} ready={data != null} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} embedded />
-            <section className="min-w-0 border-t border-line p-5 xl:border-t-0 xl:border-l xl:p-4" aria-labelledby="activity-title">
-              <h2 id="activity-title" className="type-heading text-[length:var(--type-1)]">Arriving & departing</h2>
-              <p className="mt-1 text-[length:var(--type-small)] text-ink-dim">Select a flight to explore.</p>
-              <div className="mt-4 grid gap-6 md:grid-cols-2 xl:grid-cols-1">
-                {(["arriving", "departing"] as const).map((phase) => {
-                  const flights = live.filter((c) => c.phase === phase);
-                  return (
-                    <div key={phase} className={`overflow-hidden rounded-xl border ${phase === "arriving" ? "border-accent-ink/25 bg-accent/10" : "border-depart/25 bg-depart/5"}`}>
-                      <h3 className={`flex items-center gap-2 px-3 py-3 text-[length:var(--type-1)] font-semibold ${phase === "arriving" ? "bg-accent/25 text-accent-ink" : "bg-depart/15 text-depart"}`}>
-                        {phase === "arriving" ? <AirplaneLanding size={20} weight="bold" aria-hidden="true" /> : <AirplaneTakeoff size={20} weight="bold" aria-hidden="true" />}
-                        {phase === "arriving" ? "Arriving" : "Departing"}
-                        <span className={`ml-auto min-w-6 rounded-md px-1.5 py-0.5 text-center text-[length:var(--type-small)] tabular-nums ${phase === "arriving" ? "bg-accent text-on-accent" : "bg-depart text-on-depart"}`}>{flights.length}</span>
-                      </h3>
-                      <div className="flex flex-col gap-1 p-2">
-                        {flights.map((flight) => (
-                          <button key={flight.id} type="button" aria-pressed={focus?.id === flight.id} onClick={() => setSelectedId(flight.id)}
-                            className={`flex w-full items-center justify-between gap-2 rounded-lg border px-2 py-2.5 text-left text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${focus?.id === flight.id ? phase === "arriving" ? "border-accent-ink bg-accent/25" : "border-depart bg-depart/15" : phase === "arriving" ? "border-transparent hover:bg-accent/15" : "border-transparent hover:bg-depart/10"}`}>
-                            <span className="min-w-0 break-words font-medium">{flightTitle(flight)}</span>
-                            <span className="shrink-0 text-ink-dim">{flight.distanceKm.toFixed(1)} km</span>
-                          </button>
-                        ))}
-                        {!flights.length && <p className="py-3 text-[length:var(--type-small)] text-ink-faint">{loading ? "Scanning for aircraft…" : "No aircraft right now."}</p>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+        <div className="grid items-start gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,1fr)]">
+          {/* The stage: the radar is the page, drawn straight onto the sky. */}
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[length:var(--type-small)] text-ink-dim">
+              <span className="flex flex-wrap items-center gap-x-2">
+                <span className="font-semibold text-ink">{data ? live.length : "—"}</span>
+                aircraft within {effectiveRange} km
+                {ageMs != null && !offline && (
+                  <span className="text-ink-faint">· updated {ageLabel(ageMs)} ago</span>
+                )}
+              </span>
+              <LocalTime nowTs={nowTs} />
             </div>
-            <ConditionsPanel nowTs={nowTs} weather={airport.weather} landing={airport.landing} takeoff={airport.takeoff} />
-          </div>
-          <div className="flex min-w-0 flex-col gap-6">
-            <div>
-              <FunFactsSpot selected={selected} featured={arriving ?? departing ?? live[0] ?? null} onClear={clearSelection} />
-            </div>
-            <section className="panel p-5" aria-labelledby="learning-preview-title">
-              <h2 id="learning-preview-title" className="type-heading text-[length:var(--type-1)] text-ink">Curious about what you’re seeing?</h2>
-              <p className="mt-2 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
-                Explore flight codes, aircraft and aviation terms—with examples from the plane in your spotlight.
+
+            {offline && (
+              <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-depart/50 bg-depart/10 px-3 py-2 text-[length:var(--type-0)] text-ink">
+                <WarningCircle size={18} weight="bold" aria-hidden="true" className="shrink-0 text-depart" />
+                <span>
+                  {data && ageMs != null
+                    ? `The flight feed hasn't updated for ${ageLabel(ageMs)}. What you see may be out of date.`
+                    : "Can't reach the flight feed right now."}
+                </span>
+                <button type="button" onClick={load} className="font-semibold text-accent-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-accent-ink">
+                  Try again
+                </button>
               </p>
-              <button type="button" onClick={openLearning} className="mt-3 text-[length:var(--type-0)] font-medium text-accent-ink underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-accent-ink">
-                Explore the learning centre <span aria-hidden="true">→</span>
-              </button>
+            )}
+
+            <RadarPanel contacts={reckoned} ready={data != null} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} />
+
+            <section id="activity" tabIndex={-1} className="flex min-w-0 scroll-mt-4 flex-col gap-3" aria-labelledby="activity-title">
+              <h2 id="activity-title" className="sr-only">Arriving and departing flights</h2>
+              {(["arriving", "departing"] as const).map((phase) => {
+                const flights = live.filter((c) => c.phase === phase);
+                const arrive = phase === "arriving";
+                return (
+                  <div key={phase} className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+                    <h3 className={`flex items-center gap-2 sm:mr-1 sm:min-h-11 text-[length:var(--type-0)] font-semibold ${arrive ? "text-accent-ink" : "text-depart"}`}>
+                      {arrive ? <AirplaneLanding size={20} weight="bold" aria-hidden="true" /> : <AirplaneTakeoff size={20} weight="bold" aria-hidden="true" />}
+                      {arrive ? "Arriving" : "Departing"}
+                      <span className="tabular-nums text-ink-dim">{flights.length}</span>
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                    {flights.map((flight) => (
+                      <button key={flight.id} type="button" aria-pressed={selectedId === flight.id} onClick={() => toggleSelect(flight.id)}
+                        className={`flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${selectedId === flight.id ? arrive ? "border-accent-ink bg-accent/25 text-ink" : "border-depart bg-depart/15 text-ink" : "border-line-strong text-ink hover:bg-surface-2"}`}>
+                        <span className="font-medium">{flightTitle(flight)}</span>
+                        <span className="text-ink-dim">{flight.distanceKm.toFixed(1)} km</span>
+                      </button>
+                    ))}
+                    {!flights.length && <span className="text-[length:var(--type-small)] text-ink-dim">{loading ? "Listening…" : "none right now"}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              {data && !offline && live.length === 0 && (
+                <p className="max-w-[60ch] text-[length:var(--type-small)] leading-relaxed text-ink-dim">
+                  Quiet sky over Ottawa. Nothing is in range right now, and the radar is still listening. New aircraft appear the moment the sweep finds them.
+                </p>
+              )}
             </section>
+          </div>
+
+          <div className="flex min-w-0 flex-col gap-6">
+            <FunFactsSpot selected={selected} featured={arriving ?? departing ?? live[0] ?? null} onClear={clearSelection} state={loading ? "loading" : offline && !data ? "offline" : "ready"} />
+            <ConditionsPanel nowTs={nowTs} weather={airport.weather} landing={airport.landing} takeoff={airport.takeoff} />
+            <p className="px-1 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
+              Curious what the codes and numbers mean?{" "}
+              <button type="button" onClick={openLearning} className="inline-flex min-h-11 items-center font-medium text-accent-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-accent-ink">
+                Open the learning centre
+              </button>
+            </p>
           </div>
         </div>
       )}
       </div>
 
       <div id="learning-panel" role="tabpanel" aria-labelledby="learning-tab" tabIndex={0} hidden={activeTab !== "learning"} className="mx-auto w-full max-w-4xl min-w-0">
-        <LearningCentre flight={focus} />
+        <LearningCentre flight={focus} flights={live} selectedId={selectedId} onPick={setSelectedId} />
       </div>
 
-      <footer className="order-2 mt-auto flex flex-col items-center gap-1.5 border-t border-line pt-6 text-center text-[length:var(--type-0)] tracking-normal text-ink-faint">
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+      <footer className="order-2 mt-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line pt-5 text-[length:var(--type-0)] tracking-normal text-ink-dim">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>Built by Jesse Little</span>
-          <a
-            href="mailto:info@studiolittle.ca"
-            className="text-ink-dim transition-colors hover:text-accent-ink"
-          >
-            info@studiolittle.ca
-          </a>
+          <a href="mailto:info@studiolittle.ca" className="transition-colors hover:text-accent-ink">info@studiolittle.ca</a>
+          <span aria-hidden="true" className="text-ink-faint">·</span>
+          <a href="https://adsb.lol" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:text-accent-ink hover:underline">Flight data by adsb.lol</a>
         </div>
-        <div className="mt-2 self-end">
-          <ViewerCount active={activeTab === "dashboard"} />
-        </div>
+        <ViewerCount active={activeTab === "dashboard"} />
       </footer>
     </main>
   );

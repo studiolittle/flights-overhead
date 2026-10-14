@@ -42,14 +42,12 @@ export function NightSky() {
     let cleanup: (() => void) | undefined;
     let loading = false;
 
-    async function syncTheme() {
-      const dark = document.documentElement.dataset.theme !== "light";
-      if (!dark) { cleanup?.(); cleanup = undefined; return; }
+    async function startSky() {
       if (cleanup || loading) return;
       loading = true;
       try {
         const THREE = await import("three");
-        if (disposed || !host.current || document.documentElement.dataset.theme === "light") return;
+        if (disposed || !host.current) return;
         const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         const scene = new THREE.Scene();
@@ -112,13 +110,9 @@ export function NightSky() {
         if (host.current) host.current.dataset.skyReady = "true";
       } finally { loading = false; }
     }
-    const observer = new MutationObserver(() => { void syncTheme(); });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-    void syncTheme();
-    return () => { disposed = true; observer.disconnect(); cleanup?.(); };
+    void startSky();
+    return () => { disposed = true; cleanup?.(); };
   }, []);
 
-  return <><div ref={host} className="night-sky" aria-hidden="true" /><div className="day-sky" aria-hidden="true">
-    {Array.from({ length: 14 }, (_, i) => <span key={i} style={{ left: `${(i * 37 + 7) % 100}%`, top: `${(i * 23 + 11) % 100}%`, width: i % 3 === 0 ? 5 : 3, height: i % 3 === 0 ? 5 : 3, animationDelay: `${-i * 2.7}s`, animationDuration: `${24 + i % 5 * 4}s` }} />)}
-  </div></>;
+  return <div ref={host} className="night-sky" aria-hidden="true" />;
 }

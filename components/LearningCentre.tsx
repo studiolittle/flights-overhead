@@ -54,7 +54,18 @@ function tag(live: string | null | undefined, stock: string) {
  * terms follow the flight on the board, falling back to stock examples from
  * real YOW traffic.
  */
-export function LearningCentre({ flight }: { flight: Contact | null }) {
+export function LearningCentre({
+  flight,
+  flights,
+  selectedId,
+  onPick,
+}: {
+  flight: Contact | null;
+  /** Everything in range, for the picker. */
+  flights: Contact[];
+  selectedId: string | null;
+  onPick: (id: string | null) => void;
+}) {
   const t = flightTags(flight);
   const headingId = useId();
   return (
@@ -65,21 +76,34 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
         icon={<GraduationCap size={18} weight="bold" />}
       />
 
-      <p className="px-5 pt-4 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
-        Select a plane on the radar or in the activity list. Its flight data
-        becomes the examples below. Open a topic to explore.
-      </p>
-      {flight && (
-        <p className="px-5 pt-2 text-[length:var(--type-0)] leading-snug text-ink-faint">
-          Highlighted tags are from{" "}
-          <span className="text-accent-ink">{flightTitle(flight)}</span>, on
-          the spotlight now.
+      <div className="flex flex-col gap-2 px-5 pt-4">
+        <p className="text-[length:var(--type-small)] leading-relaxed text-ink-dim">
+          {flight
+            ? "The examples below use a real flight over Ottawa. Pick another and they follow it."
+            : "No aircraft are in range, so the examples below are typical Ottawa traffic. They switch to a real flight as soon as one appears."}
         </p>
-      )}
+        {flights.length > 0 && (
+          <label className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[length:var(--type-0)] text-ink-dim">
+            Learning from
+            <select
+              className="field min-h-11 max-w-full"
+              value={selectedId ?? flight?.id ?? ""}
+              onChange={(e) => onPick(e.target.value || null)}
+            >
+              {flights.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {flightTitle(f)} · {f.phase === "departing" ? "departing" : f.phase === "arriving" ? "arriving" : "nearby"}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
       <div className="px-5 pb-1 pt-2">
         <GlossarySection
-          title="NAMES & CODES"
+          title="Names & codes"
+          defaultOpen
           summary="How a flight, and the plane flying it, are identified"
         >
           <FieldRow
@@ -155,7 +179,7 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
         </GlossarySection>
 
         <GlossarySection
-          title="THE ROUTE"
+          title="The route"
           summary="Where it came from and where it's going"
         >
           <FieldRow
@@ -176,7 +200,7 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
         </GlossarySection>
 
         <GlossarySection
-          title="THE LIVE NUMBERS"
+          title="The live numbers"
           summary="Altitude, speed, climb rate and distance"
         >
           <FieldRow
@@ -239,7 +263,7 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
         </GlossarySection>
 
         <GlossarySection
-          title="THE AIRCRAFT"
+          title="The aircraft"
           summary="Sizes, shapes and how old a design is"
         >
           <FieldRow
@@ -288,9 +312,8 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
         </GlossarySection>
 
         <GlossarySection
-          title="RUNWAYS & WEATHER"
+          title="Runways & weather"
           summary="Why runways have numbers, and how the wind picks one"
-          defaultOpen
         >
           <FieldRow
             label="RUNWAY NUMBERS"
@@ -414,7 +437,7 @@ export function LearningCentre({ flight }: { flight: Contact | null }) {
         </GlossarySection>
 
         <GlossarySection
-          title="WHERE THE DATA COMES FROM"
+          title="Where the data comes from"
           summary="Who is actually tracking these planes"
         >
           <FieldRow

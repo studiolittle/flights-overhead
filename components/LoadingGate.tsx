@@ -12,14 +12,13 @@ export function LoadingGate({ children }: { children: ReactNode }) {
     let disposed = false;
     const check = () => {
       const dashboardReady = document.querySelector('[data-dashboard-ready="true"]');
-      const skyReady = document.documentElement.dataset.theme === "light" ||
-        document.querySelector('.night-sky[data-sky-ready="true"]');
+      const skyReady = document.querySelector('.night-sky[data-sky-ready="true"]');
       if (!disposed && fontsReady && dashboardReady && skyReady) setReady(true);
     };
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, {
       subtree: true, attributes: true,
-      attributeFilter: ["data-dashboard-ready", "data-sky-ready", "data-theme"],
+      attributeFilter: ["data-dashboard-ready", "data-sky-ready"],
     });
     void document.fonts.ready.then(() => { fontsReady = true; check(); });
     // A slow feed or unavailable WebGL must never trap someone behind the loader.

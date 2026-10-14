@@ -3,11 +3,29 @@
 // Shared SVG pieces for the radar and the airport scope, so an aircraft looks
 // the same on both.
 
+import { createContext, useContext, type MouseEvent } from "react";
 import { isRotorcraft } from "@/lib/aircraft";
 import { flightLevel, metersToFt } from "@/lib/format";
 import type { Contact, FlightPhase } from "@/lib/types";
 
 export const SIZE = 1000;
+
+/**
+ * The scope is a 1000-unit viewBox drawn at whatever width the page gives it,
+ * so a fixed unit size means text that shrinks with the screen. The scope
+ * measures its rendered width and shares it here, so labels are set in real
+ * pixels and never fall below a readable size.
+ */
+export const ScopeWidthContext = createContext(460);
+
+/** Pixels to viewBox units at the scope's current rendered width. */
+export function useScopeUnits() {
+  const width = useContext(ScopeWidthContext);
+  return (px: number) => (px * SIZE) / Math.max(width, 200);
+}
+
+/** Past this fraction of the width, a blip's label flips to its left. */
+const FLIP_AFTER = 0.6;
 export const C = SIZE / 2;
 export const R_MAX = 442;
 const RINGS = [0.25, 0.5, 0.75, 1] as const;
@@ -68,9 +86,13 @@ export function ScopeFrame({
   rangeKm: number;
   crosshair?: boolean;
 }) {
+  const u = useScopeUnits();
+  const width = useContext(ScopeWidthContext);
+  // On a narrow scope the inner ring labels would crowd the aircraft.
+  const rings = width < 420 ? RINGS.filter((f) => f >= 0.5 && f !== 0.75) : RINGS;
   return (
-    <g opacity={FRAME_OPACITY}>
-      {RINGS.map((f) => (
+    <g>
+      {rings.map((f) => (
         <g key={f}>
           <circle
             cx={C}
@@ -79,12 +101,13 @@ export function ScopeFrame({
             fill="none"
             stroke="var(--color-grid)"
             strokeWidth={1.5}
+            opacity={FRAME_OPACITY}
           />
           <text
             x={C + 7}
-            y={C - R_MAX * f + 22}
+            y={C - R_MAX * f + u(16)}
             fill="var(--color-ink-faint)"
-            fontSize="var(--type-4)"
+            fontSize={u(14)}
           >
             {Math.round(rangeKm * f)}
             {f === 1 ? " KM" : ""}
@@ -105,19 +128,21 @@ export function ScopeFrame({
             y2={outer.y}
             stroke="var(--color-line-strong)"
             strokeWidth={1.5}
+            opacity={FRAME_OPACITY}
           />
         );
       })}
       {([["N", 0], ["E", 90], ["S", 180], ["W", 270]] as const).map(
         ([label, deg]) => {
-          const p = polar(C, C, R_MAX - 46, deg);
+          const p = polar(C, C, R_MAX + 30, deg);
           return (
             <text
               key={label}
               x={p.x}
               y={p.y}
               fill="var(--color-ink-dim)"
-              fontSize="var(--type-4)"
+              fontSize={u(15)}
+              fontWeight={600}
               textAnchor="middle"
               dominantBaseline="middle"
             >
@@ -173,18 +198,26 @@ export function Blip({
   pulse: boolean;
   /** Just picked up by the radar sweep: plays the detection ping. */
   fresh?: boolean;
-  onSelect: (icao24: string) => void;
+  onSelect: (icao24: string, ev?: MouseEvent) => void;
 }) {
   const track = c.trackDeg ?? 0;
   const altFt = metersToFt(c.baroAltitudeM);
   const heli = isRotorcraft(c);
   const iconScale = selected ? 1.35 : 1.2;
+  const u = useScopeUnits();
+  const width = useContext(ScopeWidthContext);
+  // On a narrow scope the aircraft crowd the airport: the altitude waits
+  // until you pick the plane.
+  const showAlt = width >= 420 || selected;
+  const flip = x > SIZE * FLIP_AFTER;
+  const labelX = flip ? -34 : 34;
+  const anchor = flip ? "end" : "start";
 
   return (
     <g
       className="blip cursor-pointer"
       style={{ transform: `translate(${x}px, ${y}px)` }}
-      onClick={() => onSelect(c.id)}
+      onClick={(ev) => onSelect(c.id, ev)}
       role="button"
       tabIndex={0}
       aria-label={`${heli ? "Helicopter " : ""}${c.callsign}, ${flightLevel(c.baroAltitudeM)}, ${distanceKm.toFixed(1)} kilometres`}
@@ -197,6 +230,16 @@ export function Blip({
     >
       {/* generous invisible hit target: about a fingertip on a phone */}
       <circle cx={0} cy={0} r={60} fill="transparent" />
+      {/* Keyboard focus ring drawn in the SVG: an outline on a <g> is unreliable. */}
+      <circle
+        className="blip-focus"
+        cx={0}
+        cy={0}
+        r={50}
+        fill="none"
+        stroke="var(--color-accent-ink)"
+        strokeWidth={4}
+      />
 
       {pulse && (
         <circle
@@ -260,26 +303,28 @@ export function Blip({
           />
         )}
         <text
-          x={34}
-          y={-8}
+          x={labelX}
+          y={-u(4)}
+          textAnchor={anchor}
           fill={color}
-          fontSize="var(--type-5)"
+          fontSize={u(15)}
           fontWeight={600}
-          strokeWidth={7}
+          strokeWidth={u(4)}
           style={{ ...HALO, letterSpacing: "0" }}
         >
           {c.callsign}
         </text>
-        <text
-          x={34}
-          y={22}
+        {showAlt && <text
+          x={labelX}
+          y={u(14)}
+          textAnchor={anchor}
           fill="var(--color-ink-dim)"
-          fontSize="var(--type-4)"
-          strokeWidth={6}
+          fontSize={u(14)}
+          strokeWidth={u(4)}
           style={HALO}
         >
           {altFt != null ? flightLevel(c.baroAltitudeM) : "--"}
-        </text>
+        </text>}
       </g>
     </g>
   );

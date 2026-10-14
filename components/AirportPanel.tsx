@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import {
   AirplaneLanding,
   AirplaneTakeoff,
+  ArrowUp,
 } from "@phosphor-icons/react/dist/ssr";
 import { HOME_AIRPORT } from "@/lib/config";
 import { compass16 } from "@/lib/format";
@@ -16,7 +17,9 @@ import {
   R_MAX,
   SIZE,
   ScopeFrame,
+  ScopeWidthContext,
   polar,
+  useScopeUnits,
 } from "./ScopeParts";
 import { SectionHeader } from "./SectionHeader";
 import { minutesAgo, type RunwayCall } from "./useAirportConditions";
@@ -142,11 +145,11 @@ function runwayHeading(ident: string): number | null {
 }
 
 /**
- * The YOW Radar section: every YOW flight within 50 km of the airport, with
- * the colour key. Tapping a plane opens it in Fun Facts.
+ * The YOW radar: every YOW flight within 50 km of the airport, drawn straight
+ * onto the sky with no card around it. Tapping a plane opens it in the
+ * spotlight.
  */
 export function RadarPanel({
-  nowTs,
   contacts,
   ready,
   selectedId,
@@ -154,9 +157,7 @@ export function RadarPanel({
   wind,
   landing,
   takeoff,
-  embedded = false,
 }: {
-  nowTs: number;
   /** Every YOW flight in the feed; the scope keeps the ones in its view. */
   contacts: Contact[];
   /** The first snapshot has arrived: what it holds counts as already detected. */
@@ -167,41 +168,60 @@ export function RadarPanel({
   wind: Wind | null;
   landing: RunwayCall;
   takeoff: RunwayCall;
-  embedded?: boolean;
 }) {
   const headingId = useId();
+  const windFrom =
+    wind && wind.dirDeg != null && wind.speedKt > 0 ? wind.dirDeg : null;
   return (
-    <section aria-labelledby={headingId} className={embedded ? "flex min-w-0 flex-col" : "panel flex min-w-0 flex-col"}>
-      <SectionHeader
-        id={headingId}
-        title={`${HOME_AIRPORT.iata} radar`}
-        aside={<LocalTime nowTs={nowTs} />}
-      />
-
-      <div className="flex flex-col gap-4 p-4 md:p-5">
-        <div className="mx-auto w-full max-w-[460px] rounded-2xl border border-line bg-canvas p-2 sm:p-4">
-          <AirportScope
-            contacts={contacts}
-            selectedId={selectedId}
-            onSelect={onSelect}
-            landing={landing.ident}
-            takeoff={takeoff.ident}
-            wind={wind}
-            zoomKm={RADAR_KM}
-            ready={ready}
-          />
-        </div>
-        <Legend />
-        <a href="https://adsb.lol" target="_blank" rel="noopener noreferrer" className="self-end text-[length:var(--type-0)] text-ink-faint underline-offset-4 hover:underline">Flight data by adsb.lol</a>
+    <section
+      aria-labelledby={headingId}
+      className="flex min-w-0 flex-col items-center gap-3"
+    >
+      <h2 id={headingId} className="sr-only">
+        {HOME_AIRPORT.iata} radar
+      </h2>
+      {/* Capped so the whole scope fits the window beside the header. */}
+      <div className="relative w-full" style={{ maxWidth: "max(320px, min(780px, calc(100dvh - 15rem)))" }}>
+        <AirportScope
+          contacts={contacts}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          landing={landing.ident}
+          takeoff={takeoff.ident}
+          zoomKm={RADAR_KM}
+          ready={ready}
+        />
+        {windFrom != null && (
+          <p className="absolute left-0 top-0 flex items-center gap-1.5 text-[length:var(--type-0)] text-ink-dim">
+            <ArrowUp
+              size={18}
+              weight="bold"
+              aria-hidden="true"
+              style={{ transform: `rotate(${windFrom + 180}deg)` }}
+            />
+            <span>
+              Wind {wind!.speedKt} kt
+              <span className="hidden sm:inline"> from the {compass16(windFrom)}</span>
+            </span>
+          </p>
+        )}
       </div>
+      <Legend />
     </section>
   );
 }
 
+/** Plain-language gloss for the aviation weather category. */
+const CATEGORY_GLOSS: Record<string, string> = {
+  VFR: "Good visibility",
+  MVFR: "Reduced visibility",
+  IFR: "Low visibility, flown on instruments",
+  LIFR: "Very low visibility",
+};
+
 /**
- * The Airport Conditions section: the runways in use and weather,
- * in one tidy left-aligned list. The weather and the
- * runway calls come from `useAirportConditions`.
+ * The Airport Conditions section: the runways in use and weather. The
+ * weather and the runway calls come from `useAirportConditions`.
  */
 export function ConditionsPanel({
   nowTs,
@@ -216,16 +236,16 @@ export function ConditionsPanel({
 }) {
   const headingId = useId();
 
-  const conditions = [
+  const category = weather?.flightCategory ?? null;
+  const readings = [
     weather?.tempC != null ? `${weather.tempC}°C` : null,
-    weather?.visibilitySm ? `Visibility ${weather.visibilitySm} SM` : null,
+    weather?.visibilitySm ? `visibility ${weather.visibilitySm} mi` : null,
     weather?.altimeterHpa != null
       ? `${Math.round(weather.altimeterHpa)} hPa`
       : null,
-    weather?.flightCategory,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  ].filter(Boolean);
+
+  const sameRunway = landing.ident != null && landing.ident === takeoff.ident;
 
   return (
     <section aria-labelledby={headingId} className="panel flex flex-col">
@@ -235,30 +255,46 @@ export function ConditionsPanel({
         aside={weather?.observedAt ? `Weather · ${minutesAgo(nowTs - weather.observedAt)}` : "Weather unavailable"}
       />
       <div className="px-5 py-4">
-          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2 text-[length:var(--type-0)] leading-snug text-ink-dim">
-            <InfoRow label="LIKELY LANDING">
-              <RunwayValue
-                icon={<AirplaneLanding size={13} weight="bold" />}
-                color={ARRIVAL_COLOR}
-                call={landing}
-                op="arrival"
-              />
+        <dl className="grid grid-cols-[max-content_minmax(0,1fr)] items-baseline gap-x-4 gap-y-3 text-[length:var(--type-0)] leading-snug text-ink-dim">
+          {sameRunway ? (
+            <InfoRow label="Runway in use">
+              <SharedRunway call={landing} takeoff={takeoff} />
             </InfoRow>
-            <InfoRow label="LIKELY DEPARTURE">
-              <RunwayValue
-                icon={<AirplaneTakeoff size={13} weight="bold" />}
-                color={DEPART_COLOR}
-                call={takeoff}
-                op="departure"
-              />
+          ) : (
+            <>
+              <InfoRow label="Likely landing">
+                <RunwayValue
+                  icon={<AirplaneLanding size={13} weight="bold" />}
+                  color={ARRIVAL_COLOR}
+                  call={landing}
+                  op="arrival"
+                />
+              </InfoRow>
+              <InfoRow label="Likely departure">
+                <RunwayValue
+                  icon={<AirplaneTakeoff size={13} weight="bold" />}
+                  color={DEPART_COLOR}
+                  call={takeoff}
+                  op="departure"
+                />
+              </InfoRow>
+            </>
+          )}
+          {(readings.length > 0 || category) && (
+            <InfoRow label="Weather">
+              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                {readings.length > 0 && <span>{readings.join(" · ")}</span>}
+                {category && (
+                  <span className="rounded-full bg-surface-2 px-2 py-1 text-ink-dim">
+                    <span className="font-semibold text-ink">{category}</span>
+                    {CATEGORY_GLOSS[category] ? ` · ${CATEGORY_GLOSS[category]}` : ""}
+                  </span>
+                )}
+              </span>
             </InfoRow>
-          </dl>
-          <p className="mt-3 text-[length:var(--type-0)] text-ink-faint">Runway estimates are inferred from aircraft activity or wind, not official tower instructions.</p>
-          <div className="mt-4 border-t border-line pt-3">
-            <dl className="mt-3 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-[length:var(--type-small)] text-ink-dim">
-            {conditions && <InfoRow label="WEATHER">{conditions}</InfoRow>}
-          </dl>
-          </div>
+          )}
+        </dl>
+        <p className="mt-3 text-[length:var(--type-0)] text-ink-faint">Runways are inferred from aircraft activity or wind, not official tower instructions.</p>
       </div>
     </section>
   );
@@ -310,6 +346,30 @@ function RunwayValue({
   );
 }
 
+/** One runway handling both arrivals and departures: "RWY 07", with where to look. */
+function SharedRunway({ call, takeoff }: { call: RunwayCall; takeoff: RunwayCall }) {
+  const h = call.ident ? runwayHeading(call.ident) : null;
+  const sourceLabel = (src: RunwayCall["source"]) =>
+    src === "seen" ? "Observed activity" : src === "wind" ? "Wind estimate" : "Insufficient evidence";
+  const tag =
+    call.source === takeoff.source
+      ? sourceLabel(call.source)
+      : "Activity and wind agree";
+  return (
+    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <span style={{ color: ARRIVAL_COLOR }}><AirplaneLanding size={13} weight="bold" /></span>
+      <span style={{ color: DEPART_COLOR }}><AirplaneTakeoff size={13} weight="bold" /></span>
+      <span className="text-[length:var(--type-3)] font-semibold text-ink">RWY {call.ident}</span>
+      {h != null && (
+        <span className="text-ink-faint">
+          arrivals in from the {compass16(h + 180)}, departures out to the {compass16(h)}
+        </span>
+      )}
+      <span className="rounded-full bg-surface-2 px-2 py-1 text-[length:var(--type-0)] text-ink-dim">{tag}</span>
+    </span>
+  );
+}
+
 /** Airport-local time and date for the radar header. */
 export function LocalTime({ nowTs }: { nowTs: number }) {
   if (!nowTs) return <span className="text-ink-dim">Ottawa time · —</span>;
@@ -332,20 +392,20 @@ export function LocalTime({ nowTs }: { nowTs: number }) {
 
 function Legend() {
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[length:var(--type-0)] tracking-normal text-ink-faint">
+    <div className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[length:var(--type-0)] tracking-normal text-ink-dim">
       <span className="flex items-center gap-1.5">
         <span
           className="inline-block size-2 rounded-full"
           style={{ background: ARRIVAL_COLOR }}
         />
-        ARRIVING
+        Arriving
       </span>
       <span className="flex items-center gap-1.5">
         <span
           className="inline-block size-2 rounded-full"
           style={{ background: DEPART_COLOR }}
         />
-        DEPARTING
+        Departing
       </span>
     </div>
   );
@@ -361,7 +421,6 @@ function AirportScope({
   onSelect,
   landing,
   takeoff,
-  wind,
   zoomKm,
   ready,
 }: {
@@ -370,10 +429,22 @@ function AirportScope({
   onSelect: (icao24: string) => void;
   landing: string | null;
   takeoff: string | null;
-  wind: Wind | null;
   zoomKm: number;
   ready: boolean;
 }) {
+  // The rendered width, so text can be set in real pixels (ScopeWidthContext).
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(460);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => setWidth(el.getBoundingClientRect().width || 460);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const ap = HOME_AIRPORT;
   const scale = R_MAX / zoomKm;
   const runwayScale = R_MAX / RUNWAY_VIEW_KM;
@@ -400,11 +471,34 @@ function AirportScope({
   );
   const shown = inView.filter((x) => sweep.isRevealed(x.c.id));
 
-  const windArrow =
-    wind && wind.dirDeg != null && wind.speedKt > 0 ? wind.dirDeg : null;
+  /**
+   * When planes are nearly on top of each other their tap areas overlap and
+   * the top one wins every tap. Pick the plane nearest the actual tap point
+   * instead, so each of a close pair can be chosen.
+   */
+  const svg = useRef<SVGSVGElement>(null);
+  const pick = (id: string, ev?: MouseEvent) => {
+    const el = svg.current;
+    if (!ev || !el) return onSelect(id);
+    const r = el.getBoundingClientRect();
+    const px = ((ev.clientX - r.left) * SIZE) / r.width;
+    const py = ((ev.clientY - r.top) * SIZE) / r.height;
+    let best = id;
+    let bestD = Infinity;
+    for (const { c, d, b } of shown) {
+      const p = polar(C, C, d * scale, b);
+      const dist = Math.hypot(p.x - px, p.y - py);
+      if (dist < bestD) {
+        bestD = dist;
+        best = c.id;
+      }
+    }
+    onSelect(best);
+  };
 
   return (
-    <div className="relative aspect-square w-full overflow-clip">
+    <ScopeWidthContext.Provider value={width}>
+    <div ref={box} className="relative aspect-square w-full overflow-clip">
       {/* The sweep: a slow, faint beam going round so the radar reads as
           searching. Fitted inside the outer ring, and behind the aircraft
           (the svg is positioned and comes later), so blips stay on top and
@@ -421,11 +515,20 @@ function AirportScope({
         aria-hidden="true"
       />
       <svg
+        ref={svg}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         className="relative block h-full w-full"
         role="img"
         aria-label={`${ap.iata} airport, ${shown.length} aircraft within ${zoomKm} km${landing ? `, landing runway ${landing}` : ""}${takeoff ? `, departing runway ${takeoff}` : ""}`}
       >
+        {/* A tint behind the rings keeps labels readable over the stars. */}
+        <circle
+          cx={C}
+          cy={C}
+          r={R_MAX}
+          fill="var(--color-canvas)"
+          fillOpacity={0.6}
+        />
         <ScopeFrame rangeKm={zoomKm} crosshair={false} />
 
         <g opacity={MAP_OPACITY}>
@@ -465,10 +568,6 @@ function AirportScope({
               </g>
             );
           })}
-
-          {windArrow != null && (
-            <WindInset fromDeg={windArrow} speedKt={wind!.speedKt} />
-          )}
         </g>
 
         {shown.map(({ c, d, b }) => {
@@ -484,12 +583,13 @@ function AirportScope({
               selected={c.id === selectedId}
               pulse={false}
               fresh={sweep.isFresh(c.id)}
-              onSelect={onSelect}
+              onSelect={pick}
             />
           );
         })}
       </svg>
     </div>
+    </ScopeWidthContext.Provider>
   );
 }
 
@@ -503,74 +603,19 @@ function RunwayLabel({
   at: { x: number; y: number };
   color: string;
 }) {
-  const p = polar(at.x, at.y, 30, end.headingDeg + 180);
+  const u = useScopeUnits();
+  const p = polar(at.x, at.y, u(16), end.headingDeg + 180);
   return (
     <text
       x={p.x}
       y={p.y}
       fill={color}
-      fontSize="var(--type-4)"
+      fontSize={u(14)}
+      fontWeight={600}
       textAnchor="middle"
       dominantBaseline="middle"
     >
       {end.ident}
     </text>
-  );
-}
-
-/**
- * Wind inset in the scope's top-left corner, outside the rings, so it never
- * lands on a runway or a blip. The arrow points the way the wind blows.
- */
-function WindInset({ fromDeg, speedKt }: { fromDeg: number; speedKt: number }) {
-  const cx = 84;
-  const cy = 104;
-  const half = 40;
-  const tail = polar(cx, cy, half, fromDeg);
-  const tip = polar(cx, cy, half, fromDeg + 180);
-  return (
-    <g>
-      <text
-        x={cx}
-        y={36}
-        fill="var(--color-ink-dim)"
-        fontSize="var(--type-3)"
-        textAnchor="middle"
-        style={{ letterSpacing: "0" }}
-      >
-        WIND
-      </text>
-      <circle
-        cx={cx}
-        cy={cy}
-        r={half + 10}
-        fill="none"
-        stroke="var(--color-line-strong)"
-        strokeWidth={1.5}
-      />
-      <line
-        x1={tail.x}
-        y1={tail.y}
-        x2={tip.x}
-        y2={tip.y}
-        stroke="var(--color-ink)"
-        strokeWidth={3}
-      />
-      <path
-        d="M -16 -11 L 0 0 L -16 11 Z"
-        transform={`translate(${tip.x} ${tip.y}) rotate(${fromDeg + 90})`}
-        fill="var(--color-ink)"
-      />
-      <text
-        x={cx}
-        y={cy + half + 38}
-        fill="var(--color-ink)"
-        fontSize="var(--type-3)"
-        textAnchor="middle"
-        style={{ letterSpacing: "0" }}
-      >
-        {speedKt} KT
-      </text>
-    </g>
   );
 }
