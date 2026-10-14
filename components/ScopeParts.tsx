@@ -4,7 +4,7 @@
 // the same on both.
 
 import { createContext, useContext, type MouseEvent } from "react";
-import { flightTitle, isRotorcraft } from "@/lib/aircraft";
+import { aircraftShape, flightTitle, type AircraftShape } from "@/lib/aircraft";
 import { flightLevel, metersToFt } from "@/lib/format";
 import type { Contact, FlightPhase } from "@/lib/types";
 
@@ -33,12 +33,116 @@ const RINGS = [0.25, 0.5, 0.75, 1] as const;
 /** Rings, ticks and labels sit back so the aircraft carry the scope. */
 const FRAME_OPACITY = 0.5;
 
+type Pt = [number, number];
+
 /**
- * Top-down airliner silhouette, nose up (north), ~42 units wingtip to
- * wingtip. Rotated to the aircraft's track, so it shows heading on its own.
+ * One closed outline from its right half, traced nose to tail along the
+ * centreline and mirrored, so every silhouette is exactly symmetric.
  */
-const PLANE_PATH =
-  "M 0 -22 C 2.2 -22 3 -19 3 -16 L 3 -6 L 21 4 L 21 8 L 3 3 L 3 13 L 9 18 L 9 21 L 0 19 L -9 21 L -9 18 L -3 13 L -3 3 L -21 8 L -21 4 L -3 -6 L -3 -16 C -3 -19 -2.2 -22 0 -22 Z";
+function mirrored(half: Pt[]): string {
+  const left = half.slice(1, -1).reverse().map(([x, y]): Pt => [-x, y]);
+  return `M ${[...half, ...left].map(([x, y]) => `${x} ${y}`).join(" L ")} Z`;
+}
+
+/** A pair of engine pods or nacelles, one under each wing. */
+function pods(...boxes: [x0: number, y0: number, x1: number, y1: number][]): string {
+  // Both drawn clockwise, like the outline, so the fill covers them solidly.
+  return boxes
+    .flatMap(([x0, y0, x1, y1]) => [
+      `M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y1} L ${x0} ${y1} Z`,
+      `M ${-x1} ${y0} L ${-x0} ${y0} L ${-x0} ${y1} L ${-x1} ${y1} Z`,
+    ])
+    .join(" ");
+}
+
+/** A propeller across the nose: one bar on the centreline. */
+function prop(halfSpan: number, y0: number, y1: number): string {
+  return `M ${-halfSpan} ${y0} L ${halfSpan} ${y0} L ${halfSpan} ${y1} L ${-halfSpan} ${y1} Z`;
+}
+
+const WIDEBODY_HALF: Pt[] = [
+  [0, -23], [2, -22.2], [3.3, -19.8], [3.7, -16], [3.7, -6.5], [22.5, 4.6],
+  [22.5, 7], [3.7, 1.6], [3.4, 13], [10, 18], [10, 20.4], [2, 18.6], [1.1, 22], [0, 22.5],
+];
+
+/**
+ * Top-down silhouettes, nose up (north), rotated to the aircraft's track so
+ * each shows heading on its own. Drawn on one grid, about 42 units wingtip to
+ * wingtip for an airliner; `scale` then sets the size against the others, so
+ * a Cessna reads small and a 777 big.
+ */
+const SHAPES: Record<Exclude<AircraftShape, "helicopter">, { d: string; scale: number }> = {
+  // Cessna 172, Piper, Cirrus: straight high wing, prop on the nose.
+  light: {
+    d:
+      mirrored([
+        [0, -16.2], [1.1, -15.6], [1.8, -13.5], [2, -10], [2, -7.2], [17.5, -7.2],
+        [17.5, -2.4], [2, -2.4], [1.5, 6], [0.9, 11], [6.2, 11.6], [6.2, 14.2], [0.7, 14], [0, 14.6],
+      ]) +
+      " " +
+      prop(5.2, -17.4, -16.5),
+    scale: 0.8,
+  },
+  // Dash 8, ATR: long straight wing, two nacelles with props, T-tail.
+  turboprop: {
+    d:
+      mirrored([
+        [0, -20], [1.5, -19.2], [2.3, -17], [2.5, -13], [2.5, -4.2], [21.5, -3.6],
+        [21.5, -0.8], [2.5, 0.8], [2.2, 12.5], [1.4, 15.5], [8, 17], [8, 18.8], [1, 18.4], [0, 19.4],
+      ]) +
+      " " +
+      pods([5.8, -8.5, 8.2, 3], [3.4, -9.9, 10.6, -9.1]),
+    scale: 0.95,
+  },
+  // Hercules: a stout fuselage and four props on a straight wing.
+  quadprop: {
+    d:
+      mirrored([
+        [0, -21], [2, -20.2], [3, -17.5], [3.2, -13], [3.2, -4], [22.5, -3.4],
+        [22.5, -0.6], [3.2, 1], [3, 10], [2, 14.5], [9, 16], [9, 18], [1.4, 18], [0, 19],
+      ]) +
+      " " +
+      pods(
+        [5.6, -7.5, 7.6, 2],
+        [12, -7, 14, 2.4],
+        [3.9, -8.6, 9.3, -7.9],
+        [10.3, -8.1, 15.7, -7.4],
+      ),
+    scale: 1.12,
+  },
+  // CRJ, Citation, Gulfstream: slim, swept, engines on the rear fuselage.
+  rearjet: {
+    d:
+      mirrored([
+        [0, -20], [1.3, -19.2], [2, -17], [2.2, -13], [2.2, -3], [15.5, 3.8],
+        [15.5, 5.6], [2.2, 2.4], [2.2, 13], [1.6, 16], [7.6, 17.8], [7.6, 19.4], [1.1, 19], [0, 19.6],
+      ]) +
+      " " +
+      pods([2.6, 6.5, 5.6, 12.6]),
+    scale: 0.9,
+  },
+  // A320, 737, A220, E-jets: swept wing, an engine under each.
+  narrowbody: {
+    d:
+      mirrored([
+        [0, -22], [1.6, -21.2], [2.6, -19], [3, -16], [3, -6], [20.5, 3.8],
+        [20.5, 6.5], [3, 2], [2.8, 12], [8.8, 17], [8.8, 19.5], [1.6, 17.6], [0.9, 20.6], [0, 21],
+      ]) +
+      " " +
+      pods([7.3, -5.6, 9.9, -0.6]),
+    scale: 1,
+  },
+  // 777, 787, A330: wider fuselage, longer wing, big engines.
+  widebody: {
+    d: mirrored(WIDEBODY_HALF) + " " + pods([7.4, -6.6, 10.8, -0.2]),
+    scale: 1.22,
+  },
+  // 747, C-17, KC-135: four engines under the wing.
+  quad: {
+    d: mirrored(WIDEBODY_HALF) + " " + pods([6.6, -6.4, 9.2, -1.6], [13.4, -2.6, 16, 2]),
+    scale: 1.3,
+  },
+};
 
 /**
  * Top-down helicopter, nose up: a rounded cabin, a thin tail boom and the
@@ -242,14 +346,38 @@ export function placeLabels(
 export function PlaneGlyph({ color, hollow }: { color: string; hollow: boolean }) {
   return (
     <svg width="16" height="16" viewBox="-26 -26 52 52" aria-hidden="true">
-      <path
-        d={PLANE_PATH}
-        fill={hollow ? "transparent" : color}
-        stroke={hollow ? color : "none"}
-        strokeWidth={hollow ? 3.5 : 0}
-        strokeLinejoin="round"
-      />
+      <Silhouette d={SHAPES.narrowbody.d} color={color} hollow={hollow} inside="var(--color-canvas)" />
     </svg>
+  );
+}
+
+/**
+ * A silhouette, solid or hollow. Hollow is drawn as a thick outline with the
+ * shape filled again on top, so only the outer edge shows: engines and props
+ * merge into the wing instead of leaving their own outlines across it.
+ */
+function Silhouette({
+  d,
+  color,
+  hollow,
+  inside = "var(--color-canvas)",
+  transform,
+}: {
+  d: string;
+  color: string;
+  hollow: boolean;
+  /** What the hollow shows through: the colour behind the scope. */
+  inside?: string;
+  transform?: string;
+}) {
+  if (!hollow) {
+    return <path d={d} transform={transform} fill={color} strokeWidth={2.5} style={HALO} />;
+  }
+  return (
+    <g transform={transform}>
+      <path d={d} fill={color} stroke={color} strokeWidth={4.5} strokeLinejoin="round" />
+      <path d={d} fill={inside} />
+    </g>
   );
 }
 
@@ -262,7 +390,8 @@ const PHASE_SPOKEN: Record<FlightPhase, string> = {
 };
 
 /**
- * One aircraft: silhouette pointing along its track, callsign, altitude.
+ * One aircraft: a silhouette of its kind (light single, turboprop, jet,
+ * widebody...) pointing along its track, with callsign and altitude.
  * Arrivals are solid; departures are hollow, so the two read apart without
  * relying on hue.
  */
@@ -292,7 +421,8 @@ export function Blip({
 }) {
   const track = c.trackDeg ?? 0;
   const altFt = metersToFt(c.baroAltitudeM);
-  const heli = isRotorcraft(c);
+  const shape = aircraftShape(c);
+  const heli = shape === "helicopter";
   const hollow = c.phase === "departing";
   const iconScale = selected ? 1.35 : 1.2;
   const u = useScopeUnits();
@@ -302,11 +432,6 @@ export function Blip({
   const showAlt = width >= 420 || selected;
   const labelX = label.side === "right" ? LABEL_GAP : -LABEL_GAP;
   const anchor = label.side === "right" ? "start" : "end";
-  // Hollow shapes keep the panel colour inside and the phase colour as an outline.
-  const body = hollow
-    ? { fill: "var(--color-surface)", stroke: color, strokeWidth: 3, strokeLinejoin: "round" as const }
-    : { fill: color, strokeWidth: 2.5, style: HALO };
-
   return (
     <g
       className="blip cursor-pointer"
@@ -363,7 +488,7 @@ export function Blip({
       <g className="blip-body">
         {heli ? (
           <g transform={`rotate(${track}) scale(${iconScale})`}>
-            <path d={HELI_BODY} {...body} />
+            <Silhouette d={HELI_BODY} color={color} hollow={hollow} />
             <g transform={`translate(0 ${HELI_MAST_Y})`}>
               {/* The blur of the blades, under the blades themselves. */}
               <circle r={22} fill={color} opacity={0.14} />
@@ -378,10 +503,11 @@ export function Blip({
             </g>
           </g>
         ) : (
-          <path
-            d={PLANE_PATH}
-            transform={`rotate(${track}) scale(${iconScale})`}
-            {...body}
+          <Silhouette
+            d={SHAPES[shape].d}
+            color={color}
+            hollow={hollow}
+            transform={`rotate(${track}) scale(${iconScale * SHAPES[shape].scale})`}
           />
         )}
         <text

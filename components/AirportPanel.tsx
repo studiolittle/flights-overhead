@@ -558,6 +558,11 @@ function AirportScope({
             );
             return (
               <g key={`${a.ident}/${b.ident}`}>
+                {/* Each end's centreline, dotted out to the rim: the line a
+                    plane follows in to land on that end, or out after taking
+                    off from the other one. */}
+                <Centreline from={pa} away={pb} use={a.ident === landing ? "arrival" : b.ident === takeoff ? "departure" : null} />
+                <Centreline from={pb} away={pa} use={b.ident === landing ? "arrival" : a.ident === takeoff ? "departure" : null} />
                 <line
                   x1={pa.x}
                   y1={pa.y}
@@ -605,6 +610,48 @@ function AirportScope({
       </svg>
     </div>
     </ScopeWidthContext.Provider>
+  );
+}
+
+/**
+ * A runway's extended centreline beyond one end, dotted from just past the
+ * runway number out to the edge of the scope. In the arrival or departure
+ * colour when that is how the end is in use; faint otherwise.
+ */
+function Centreline({
+  from,
+  away,
+  use,
+}: {
+  /** The runway end the line leaves from. */
+  from: { x: number; y: number };
+  /** The other end: the line runs directly away from it. */
+  away: { x: number; y: number };
+  use: "arrival" | "departure" | null;
+}) {
+  const u = useScopeUnits();
+  const len = Math.hypot(from.x - away.x, from.y - away.y) || 1;
+  const dx = (from.x - away.x) / len;
+  const dy = (from.y - away.y) / len;
+  // Where the line meets the outer ring.
+  const wx = from.x - C;
+  const wy = from.y - C;
+  const b = wx * dx + wy * dy;
+  const reach = -b + Math.sqrt(Math.max(0, b * b - (wx * wx + wy * wy - R_MAX * R_MAX)));
+  const gap = u(26);
+  if (reach <= gap) return null;
+  return (
+    <line
+      x1={from.x + dx * gap}
+      y1={from.y + dy * gap}
+      x2={from.x + dx * reach}
+      y2={from.y + dy * reach}
+      stroke={use === "arrival" ? ARRIVAL_COLOR : use === "departure" ? DEPART_COLOR : "var(--color-ink-faint)"}
+      strokeOpacity={use ? 0.75 : 0.3}
+      strokeWidth={u(1.5)}
+      strokeDasharray={`${u(2)} ${u(5)}`}
+      strokeLinecap="round"
+    />
   );
 }
 

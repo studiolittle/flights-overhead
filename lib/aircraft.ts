@@ -256,6 +256,68 @@ export function isRotorcraft(c: Contact): boolean {
   return f != null && /helicopter/i.test(f.category);
 }
 
+/** The silhouette the radar draws for an aircraft. */
+export type AircraftShape =
+  | "light"
+  | "turboprop"
+  | "rearjet"
+  | "narrowbody"
+  | "widebody"
+  | "quad"
+  | "quadprop"
+  | "helicopter";
+
+/**
+ * ICAO type designators by silhouette, checked in order. Four engines first,
+ * then widebodies, so a 747 never reads as a twin; rear-engined jets before
+ * the light singles, because Citation codes (C25A, C560) share a prefix with
+ * Cessna singles (C172, C208).
+ */
+const SHAPE_BY_TYPE: [AircraftShape, RegExp][] = [
+  ["quadprop", /^(C130|C30J|A400|AN12|AN22|L188|P3)$/],
+  ["quad", /^(B74\w|VC25|A34\d|A38\d|A124|C17|C5M?|K35R|C135|E3\w|E6|IL76)$/],
+  ["widebody", /^(A30\w|A310|A33\d|A35\w|B76\d|B77\w|B78\w|MD11|DC10|L101|IL96|KC10)$/],
+  ["rearjet", /^(CRJ\w|CL\d\d|GLEX|GL\dT|GLF\d|GA\dC|C25\w|C5[0-6]\w|C510|C68\w|C700|C750|E5[045]\w|E545|E550|LJ\d\d|H25\w|FA\w\w|F2TH|F900|F20|BE40|PRM1|HDJT|EA50|PC24|B712|MD8\d|MD90|DC9\w?|F100|F70|GALX|ASTR|WW24|ALJT|T-?33)$/],
+  ["narrowbody", /^(A31[89]|A32\w|A19N|A20N|A21N|B73\w|B3\dM|B75\d|C32|C40|BCS\d|E17\d|E19\d|E75\w|E29\d|A22\d|C919|SU95|B72\d)$/],
+  ["turboprop", /^(DH8\w|AT[4-7]\w|DHC6|DHC7|DH7|B350|BE20|BE30|BE9\w|B190|BE1\d|D228|D328|SW\d|JS\d\d|SF34|CN35|C295|CV58|E120|SB20|AN2[46]|PA31|PA34|PA44|PA60|C310|C340|C402|C404|C414|C421|BE55|BE58|BE76|DA42|DA62|P68|L410)$/],
+  ["light", /^(C1\d\d|C2[0-1]\d|C206|C208|PA\d\d\w?|P28\w|SR2\d|S22T|DA20|DA40|BE3\d|BE23|M20\w|PC12|PC6|PC21|TBM\w|KODI|DHC2|DHC3|AA5|RV\w*|GLID|ULAC|CH\d\d|DV20|AC11)$/],
+];
+
+/**
+ * Which silhouette to draw: the aircraft type when the feed names one, then
+ * the facts table's category, then the transponder's emitter size class
+ * (A1 light, A2 small, A3 large, A4 757, A5 heavy, A6 fast, A7 rotorcraft).
+ * Falls back to an airliner, the commonest thing over YOW.
+ */
+export function aircraftShape(c: Contact): AircraftShape {
+  if (isRotorcraft(c)) return "helicopter";
+  const type = c.enrichment?.icaoType?.toUpperCase() ?? null;
+  if (type) {
+    for (const [shape, re] of SHAPE_BY_TYPE) if (re.test(type)) return shape;
+  }
+  const cat = factsFor(type)?.category ?? "";
+  if (/widebody|heavy/i.test(cat)) return "widebody";
+  if (/narrowbody|head-of-state/i.test(cat)) return "narrowbody";
+  if (/jet/i.test(cat)) return "rearjet";
+  if (/turboprop|military transport/i.test(cat)) return "turboprop";
+  if (/GA|bush|trainer|homebuilt/.test(cat)) return "light";
+  switch (c.category?.toUpperCase()) {
+    case "A1":
+    case "B1":
+    case "B4":
+    case "B6":
+      return "light";
+    case "A2":
+      return "turboprop";
+    case "A5":
+      return "widebody";
+    case "A6":
+      return "rearjet";
+    default:
+      return "narrowbody";
+  }
+}
+
 export function squawkInfo(
   squawk: string | null,
 ): { label: string; emergency: boolean } | null {
