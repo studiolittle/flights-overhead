@@ -24,7 +24,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Flights Overhead",
   description:
-    "An arrivals board for the aircraft passing over your house: what it is, and where it came from.",
+    "Live air traffic within 50 km of Ottawa airport: tap a plane to see who is flying it, where it is going, and fun facts about the aircraft.",
 };
 
 export default function RootLayout({

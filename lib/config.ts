@@ -1,9 +1,6 @@
 import type { HomeAirport, Station } from "./types";
 
-/**
- * The only airport the app shows traffic for, and the point the radar
- * centres on before anyone sets a home location.
- */
+/** The only airport the app shows traffic for; the radar centres on it. */
 export const HOME_AIRPORT: HomeAirport = {
   iata: "YOW",
   icao: "CYOW",
@@ -41,9 +38,8 @@ export const HOME_AIRPORT: HomeAirport = {
 export const AIRPORT_VIEW_KM = 12;
 
 /**
- * Where the radar points before anyone sets a home location: the airport
- * itself. Override per-deployment with HOME_LAT / HOME_LON, or just type a
- * postal code in the app.
+ * The point distances are measured from: the airport itself. Override
+ * per-deployment with HOME_LAT / HOME_LON.
  */
 export const DEFAULT_STATION: Station = {
   lat: HOME_AIRPORT.lat,

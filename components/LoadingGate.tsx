@@ -11,17 +11,18 @@ export function LoadingGate({ children }: { children: ReactNode }) {
     let fontsReady = false;
     let disposed = false;
     const check = () => {
+      // The starfield is decoration: it fades in over its CSS gradient
+      // whenever it is ready, and never holds up the flights.
       const dashboardReady = document.querySelector('[data-dashboard-ready="true"]');
-      const skyReady = document.querySelector('.night-sky[data-sky-ready="true"]');
-      if (!disposed && fontsReady && dashboardReady && skyReady) setReady(true);
+      if (!disposed && fontsReady && dashboardReady) setReady(true);
     };
     const observer = new MutationObserver(check);
     observer.observe(document.documentElement, {
       subtree: true, attributes: true,
-      attributeFilter: ["data-dashboard-ready", "data-sky-ready"],
+      attributeFilter: ["data-dashboard-ready"],
     });
     void document.fonts.ready.then(() => { fontsReady = true; check(); });
-    // A slow feed or unavailable WebGL must never trap someone behind the loader.
+    // A slow feed must never trap someone behind the loader.
     const fallback = setTimeout(() => setReady(true), 6000);
     return () => { disposed = true; observer.disconnect(); clearTimeout(fallback); };
   }, []);

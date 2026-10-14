@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { memo, useId } from "react";
 import { GraduationCap } from "@phosphor-icons/react/dist/ssr";
 import { categoryLabel, decodeCallsign, flightTitle } from "@/lib/aircraft";
 import { factsFor, firstYear } from "@/lib/facts";
@@ -54,7 +54,13 @@ function tag(live: string | null | undefined, stock: string) {
  * terms follow the flight on the board, falling back to stock examples from
  * real YOW traffic.
  */
-export function LearningCentre({
+export const LearningCentre = memo(
+  LearningCentreBody,
+  // Live numbers tick every second; while the tab is hidden nobody sees them.
+  (prev, next) => prev.hidden && next.hidden,
+);
+
+function LearningCentreBody({
   flight,
   flights,
   selectedId,
@@ -65,6 +71,8 @@ export function LearningCentre({
   flights: Contact[];
   selectedId: string | null;
   onPick: (id: string | null) => void;
+  /** The tab is not showing: skip re-rendering until it is. */
+  hidden: boolean;
 }) {
   const t = flightTags(flight);
   const headingId = useId();

@@ -18,7 +18,7 @@ A calm, local view of one airport, not a global tracker. It infers runway use in
 ## Capabilities and Constraints
 - Live feed from adsb.lol (free; attribution must stay visible). No paid data sources.
 - Radar with sweep, arrivals/departures list, aircraft spotlight, airport conditions (METAR, runway inference), Learning centre, viewer count.
-- Theme defaults to Ottawa day/night, with a manual toggle.
+- Dark theme only: the page is the night sky.
 - Next.js, Tailwind, deployed on Vercel.
 - The feed is often empty off-peak; empty states are a first-class case.
 

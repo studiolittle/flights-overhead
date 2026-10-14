@@ -14,10 +14,12 @@ import {
   Blip,
   C,
   PHASE_COLOR,
+  PlaneGlyph,
   R_MAX,
   SIZE,
   ScopeFrame,
   ScopeWidthContext,
+  placeLabels,
   polar,
   useScopeUnits,
 } from "./ScopeParts";
@@ -149,9 +151,13 @@ function runwayHeading(ident: string): number | null {
  * onto the sky with no card around it. Tapping a plane opens it in the
  * spotlight.
  */
+/** Where the flight feed is: drives the status dot and the sweep. */
+export type FeedStatus = "loading" | "live" | "offline";
+
 export function RadarPanel({
   contacts,
   ready,
+  live,
   selectedId,
   onSelect,
   wind,
@@ -162,6 +168,8 @@ export function RadarPanel({
   contacts: Contact[];
   /** The first snapshot has arrived: what it holds counts as already detected. */
   ready: boolean;
+  /** The feed is current. Off, the sweep stops: nothing new is being found. */
+  live: boolean;
   /** The flight tapped on the radar, drawn highlighted. */
   selectedId: string | null;
   onSelect: (icao24: string) => void;
@@ -174,8 +182,9 @@ export function RadarPanel({
     wind && wind.dirDeg != null && wind.speedKt > 0 ? wind.dirDeg : null;
   return (
     <section
+      id="radar"
       aria-labelledby={headingId}
-      className="flex min-w-0 flex-col items-center gap-3"
+      className="flex min-w-0 scroll-mt-2 flex-col items-center gap-3"
     >
       <h2 id={headingId} className="sr-only">
         {HOME_AIRPORT.iata} radar
@@ -190,6 +199,7 @@ export function RadarPanel({
           takeoff={takeoff.ident}
           zoomKm={RADAR_KM}
           ready={ready}
+          live={live}
         />
         {windFrom != null && (
           <p className="absolute left-0 top-0 flex items-center gap-1.5 text-[length:var(--type-0)] text-ink-dim">
@@ -200,8 +210,7 @@ export function RadarPanel({
               style={{ transform: `rotate(${windFrom + 180}deg)` }}
             />
             <span>
-              Wind {wind!.speedKt} kt
-              <span className="hidden sm:inline"> from the {compass16(windFrom)}</span>
+              Wind {wind!.speedKt} kt from <span className="hidden sm:inline">the </span>{compass16(windFrom)}
             </span>
           </p>
         )}
@@ -371,12 +380,13 @@ function SharedRunway({ call, takeoff }: { call: RunwayCall; takeoff: RunwayCall
 }
 
 /** Airport-local time and date for the radar header. */
-export function LocalTime({ nowTs }: { nowTs: number }) {
+export function LocalTime({ nowTs, status }: { nowTs: number; status: FeedStatus }) {
   if (!nowTs) return <span className="text-ink-dim">Ottawa time · —</span>;
   const now = new Date(nowTs);
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-      <span className="status-dot" aria-hidden="true" />
+      {/* Green and breathing only while the feed is current. */}
+      <span className={`status-dot status-${status}`} aria-hidden="true" />
       <span>Ottawa · {now.toLocaleTimeString("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit" })}</span>
       <span className="text-ink-faint">
         {now.toLocaleDateString("en-CA", {
@@ -390,21 +400,16 @@ export function LocalTime({ nowTs }: { nowTs: number }) {
   );
 }
 
+/** Arrivals are solid, departures hollow: shape tells them apart, not just hue. */
 function Legend() {
   return (
-    <div className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[length:var(--type-0)] tracking-normal text-ink-dim">
+    <div aria-hidden="true" className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-[length:var(--type-0)] tracking-normal text-ink-dim">
       <span className="flex items-center gap-1.5">
-        <span
-          className="inline-block size-2 rounded-full"
-          style={{ background: ARRIVAL_COLOR }}
-        />
+        <PlaneGlyph color={ARRIVAL_COLOR} hollow={false} />
         Arriving
       </span>
       <span className="flex items-center gap-1.5">
-        <span
-          className="inline-block size-2 rounded-full"
-          style={{ background: DEPART_COLOR }}
-        />
+        <PlaneGlyph color={DEPART_COLOR} hollow />
         Departing
       </span>
     </div>
@@ -423,6 +428,7 @@ function AirportScope({
   takeoff,
   zoomKm,
   ready,
+  live,
 }: {
   contacts: Contact[];
   selectedId: string | null;
@@ -431,6 +437,7 @@ function AirportScope({
   takeoff: string | null;
   zoomKm: number;
   ready: boolean;
+  live: boolean;
 }) {
   // The rendered width, so text can be set in real pixels (ScopeWidthContext).
   const box = useRef<HTMLDivElement>(null);
@@ -470,6 +477,15 @@ function AirportScope({
     ready,
   );
   const shown = inView.filter((x) => sweep.isRevealed(x.c.id));
+  // This component provides the width context, so it converts with its own width.
+  const u = (px: number) => (px * SIZE) / Math.max(width, 200);
+  const placed = shown.map(({ c, d, b }) => ({ c, d, ...polar(C, C, d * scale, b) }));
+  const labels = placeLabels(placed, u);
+
+  /** A runway number under a plane or its label steps back so the plane reads. */
+  const crowded = (x: number, y: number) =>
+    placed.some((p) => Math.hypot(p.x - x, p.y - y) < u(30)) ||
+    labels.some((l) => x > l.x0 - u(6) && x < l.x1 + u(6) && y > l.y0 - u(6) && y < l.y1 + u(6));
 
   /**
    * When planes are nearly on top of each other their tap areas overlap and
@@ -505,7 +521,7 @@ function AirportScope({
           tappable. It is a rotating square, so the wrapper clips it: near
           45° its corners would reach past the panel and widen the page on
           phones. */}
-      <div
+      {live && <div
         className="radar-sweep"
         style={{
           inset: `${((C - R_MAX) / SIZE) * 100}%`,
@@ -513,12 +529,12 @@ function AirportScope({
           animationDelay: `${sweep.delayMs}ms`,
         }}
         aria-hidden="true"
-      />
+      />}
       <svg
         ref={svg}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="relative block h-full w-full"
-        role="img"
+        className="relative block h-full w-full tabular-nums"
+        role="group"
         aria-label={`${ap.iata} airport, ${shown.length} aircraft within ${zoomKm} km${landing ? `, landing runway ${landing}` : ""}${takeoff ? `, departing runway ${takeoff}` : ""}`}
       >
         {/* A tint behind the rings keeps labels readable over the stars. */}
@@ -528,10 +544,11 @@ function AirportScope({
           r={R_MAX}
           fill="var(--color-canvas)"
           fillOpacity={0.6}
+          aria-hidden="true"
         />
         <ScopeFrame rangeKm={zoomKm} crosshair={false} />
 
-        <g opacity={MAP_OPACITY}>
+        <g opacity={MAP_OPACITY} aria-hidden="true">
           {ap.runways.map((rwy) => {
             const [a, b] = rwy.ends;
             const pa = toRunway(a.lat, a.lon);
@@ -556,6 +573,7 @@ function AirportScope({
                     key={end.ident}
                     end={end}
                     at={toRunway(end.lat, end.lon)}
+                    crowded={crowded}
                     color={
                       end.ident === landing
                         ? ARRIVAL_COLOR
@@ -570,23 +588,20 @@ function AirportScope({
           })}
         </g>
 
-        {shown.map(({ c, d, b }) => {
-          const p = polar(C, C, d * scale, b);
-          return (
-            <Blip
-              key={c.id}
-              contact={c}
-              x={p.x}
-              y={p.y}
-              distanceKm={d}
-              color={PHASE_COLOR[c.phase]}
-              selected={c.id === selectedId}
-              pulse={false}
-              fresh={sweep.isFresh(c.id)}
-              onSelect={pick}
-            />
-          );
-        })}
+        {placed.map(({ c, d, x, y }, i) => (
+          <Blip
+            key={c.id}
+            contact={c}
+            x={x}
+            y={y}
+            distanceKm={d}
+            color={PHASE_COLOR[c.phase]}
+            selected={c.id === selectedId}
+            fresh={sweep.isFresh(c.id)}
+            label={labels[i]}
+            onSelect={pick}
+          />
+        ))}
       </svg>
     </div>
     </ScopeWidthContext.Provider>
@@ -598,10 +613,12 @@ function RunwayLabel({
   end,
   at,
   color,
+  crowded,
 }: {
   end: RunwayEnd;
   at: { x: number; y: number };
   color: string;
+  crowded: (x: number, y: number) => boolean;
 }) {
   const u = useScopeUnits();
   const p = polar(at.x, at.y, u(16), end.headingDeg + 180);
@@ -609,6 +626,8 @@ function RunwayLabel({
     <text
       x={p.x}
       y={p.y}
+      opacity={crowded(p.x, p.y) ? 0.25 : 1}
+      className="transition-opacity duration-300"
       fill={color}
       fontSize={u(14)}
       fontWeight={600}

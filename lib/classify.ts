@@ -154,18 +154,3 @@ export function isCruising(
     (vs == null || Math.abs(vs) < VS_THRESHOLD)
   );
 }
-
-export const PHASE_LABEL: Record<FlightPhase, string> = {
-  arriving: "NOW ARRIVING",
-  departing: "NOW DEPARTING",
-  overflight: "PASSING OVER",
-  unknown: "IN RANGE",
-};
-
-/** Short form for dense rows. */
-export const PHASE_SHORT: Record<FlightPhase, string> = {
-  arriving: "ARR",
-  departing: "DEP",
-  overflight: "OVR",
-  unknown: "---",
-};

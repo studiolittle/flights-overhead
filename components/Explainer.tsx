@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import { Minus, Plus } from "@phosphor-icons/react/dist/ssr";
 
 /** Visible keyboard focus for the text-style toggles below. */
 const FOCUS =
@@ -98,6 +99,8 @@ export function GlossarySection({
 
   return (
     <div className="border-t border-line first:border-t-0">
+      {/* A heading per topic, so screen readers can jump between them. */}
+      <h3>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -115,16 +118,15 @@ export function GlossarySection({
         </span>
         <span
           aria-hidden="true"
-          className="shrink-0 text-[length:var(--type-2)] leading-none text-accent-ink"
+          className="flex shrink-0 text-accent-ink"
         >
-          {open ? "–" : "+"}
+          {open ? <Minus size={18} weight="bold" /> : <Plus size={18} weight="bold" />}
         </span>
       </button>
-      {open && (
-        <div id={panelId} className="pb-4">
-          {children}
-        </div>
-      )}
+      </h3>
+      <div id={panelId} hidden={!open} className="pb-4">
+        {children}
+      </div>
     </div>
   );
 }

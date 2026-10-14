@@ -1,48 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import {
-  AirplaneLanding,
-  AirplaneTakeoff,
-  ArrowRight,
-  BeerStein,
-  X,
-} from "@phosphor-icons/react/dist/ssr";
-import { PHASE_LABEL } from "@/lib/classify";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { categoryLabel, flightTitle, squawkInfo } from "@/lib/aircraft";
 import { compass16, flightLevel, msToFpm, msToKt } from "@/lib/format";
 import type { Contact } from "@/lib/types";
 import { AircraftFacts } from "./AircraftFacts";
-
-/** Which side of the board this is. */
-export type BoardSlot = "arriving" | "departing";
-
-/**
- * Arrivals and departures each get their own colour: a solid banner, and the
- * whole card takes on a tint of it.
- */
-const SLOT_STYLE: Record<BoardSlot, { ink: string; bg: string; fg: string }> = {
-  arriving: {
-    ink: "var(--color-accent-ink)",
-    bg: "var(--color-accent)",
-    fg: "var(--color-on-accent)",
-  },
-  departing: {
-    ink: "var(--color-depart)",
-    bg: "var(--color-depart)",
-    fg: "var(--color-on-depart)",
-  },
-};
-
-/** Takes its colour from the surrounding text. */
-function SlotIcon({ slot, size }: { slot: BoardSlot; size: number }) {
-  const props = { size, weight: "bold" as const };
-  return slot === "arriving" ? (
-    <AirplaneLanding {...props} />
-  ) : (
-    <AirplaneTakeoff {...props} />
-  );
-}
 
 function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
   const [failed, setFailed] = useState(false);
@@ -54,65 +17,39 @@ function AircraftPhoto({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="h-[52px] w-[84px] rounded-lg border border-line object-cover"
+      className="h-[52px] w-[84px] shrink-0 rounded-lg border border-line object-cover"
     />
   );
 }
 
 /**
- * Time the board spends fading out the old content before the new content
- * swaps in. Must match the `.board-swap` transition duration in
- * globals.css.
+ * Time the card spends fading out the old flight before the new one swaps
+ * in. Must match the `.board-swap` transition duration in globals.css.
  */
 const BOARD_SWAP_MS = 200;
 
 /**
- * A flight card, in two versions:
- *
- * - "board": Now Arriving / Now Departing. Small and fixed on the flight
- *   nearest the airport: who it is, the route and one line of live numbers.
- *   No photo, no fun facts: those live under the radar.
- * - "picked": the full card for a flight you tapped on the radar, fun
- *   facts included.
+ * The spotlight's flight card: who it is, the route, the fun facts about the
+ * type, and a quiet line of live numbers.
  */
-export function FlightBoard({
-  slot,
-  contact,
-  emptyText,
-  variant = "board",
-  onClear,
-}: {
-  slot: BoardSlot;
-  contact: Contact | null;
-  emptyText: string;
-  variant?: "board" | "picked";
-  /** picked: close the card. */
-  onClear?: () => void;
-}) {
-
+export function FlightBoard({ contact }: { contact: Contact }) {
   // What is actually on screen right now. It lags `contact` by one swap
-  // cycle when the flight identity changes, so the old content stays put
-  // for the leave animation instead of vanishing the instant a new flight
-  // takes over the board.
+  // cycle when the flight changes, so the old flight stays put for the leave
+  // animation instead of vanishing the instant a new one takes over.
   const [shown, setShown] = useState(contact);
   const [swap, setSwap] = useState<"idle" | "leaving" | "entering">("idle");
-  /** The flight id currently on screen — only this identity change animates. */
-  const shownId = useRef<string | null>(contact?.id ?? null);
-  /** A board is a section named by its banner (NOW ARRIVING / NOW DEPARTING). */
-  const headingId = useId();
+  /** The flight id currently on screen: only this identity change animates. */
+  const shownId = useRef(contact.id);
 
   useEffect(() => {
-    const nextId = contact?.id ?? null;
-    if (nextId === shownId.current) {
-      // Same flight (or still empty): just refresh the live numbers.
+    if (contact.id === shownId.current) {
+      // Same flight: just refresh the live numbers.
       setShown(contact);
       return;
     }
-    // A different flight (or the empty state) is taking over the board:
-    // fade the current content out, then swap and fade the new content in.
     setSwap("leaving");
     const timer = setTimeout(() => {
-      shownId.current = nextId;
+      shownId.current = contact.id;
       setShown(contact);
       setSwap("entering");
       // Paint the entering (offset, transparent) state once before flipping
@@ -126,36 +63,6 @@ export function FlightBoard({
 
   const swapClass =
     swap === "leaving" ? "board-leave" : swap === "entering" ? "board-enter" : "";
-  const style = SLOT_STYLE[slot];
-  const picked = variant === "picked";
-
-  if (!shown) {
-    return (
-      <section
-        aria-labelledby={headingId}
-        className={`panel board-swap ${swapClass} flex flex-col`}
-      >
-        <div
-          className="flex items-center gap-2.5 rounded-t-2xl border-b border-line px-5 py-4"
-          style={{ color: style.ink }}
-        >
-          <SlotIcon slot={slot} size={18} />
-          <h2
-            id={headingId}
-            className="type-heading whitespace-nowrap text-[length:var(--type-1)]"
-          >
-            {PHASE_LABEL[slot]}
-          </h2>
-        </div>
-        <div className="flex items-center gap-3 px-5 py-6">
-          <BeerStein size={20} weight="bold" className="shrink-0 text-accent-ink" />
-          <p className="text-[length:var(--type-small)] leading-relaxed text-ink-faint">
-            {emptyText}
-          </p>
-        </div>
-      </section>
-    );
-  }
 
   const e = shown.enrichment;
   const squawk = squawkInfo(shown.squawk);
@@ -187,146 +94,74 @@ export function FlightBoard({
     .filter(Boolean)
     .join(" · ");
 
-  // The picked card sits inside the Fun Facts section, so only a board is a
-  // section of its own.
-  const Root = picked ? "div" : "section";
-
   return (
-    <Root
-      aria-labelledby={picked ? undefined : headingId}
-      className={`${picked ? "" : "panel "}board-swap ${swapClass} flex flex-col`}
-      // The picked card sits inside the Fun Facts section: no panel of its
-      // own and no arriving/departing colours, so it never reads as another
-      // Now Arriving / Now Departing board.
-      style={
-        picked
-          ? undefined
-          : {
-              borderColor: "var(--color-line)",
-            }
-      }
-    >
-      {!picked && (
-        <div
-          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-t-2xl border-b border-line px-5 py-4"
-          style={{ background: `color-mix(in srgb, ${style.bg} 8%, var(--color-surface))`, color: style.ink }}
-        >
-          <span>
-            <SlotIcon slot={slot} size={18} />
-          </span>
-          <h2
-            id={headingId}
-            className="whitespace-nowrap text-[length:var(--type-1)] font-semibold leading-none tracking-normal"
-          >
-            {PHASE_LABEL[slot]}
-          </h2>
-
-          {squawk?.emergency && (
-            <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
-              {squawk.label.toUpperCase()}
-            </span>
-          )}
-        </div>
-      )}
-
-      <div className={`flex flex-col px-5 py-5 ${picked ? "gap-3.5" : "gap-3"}`}>
-        {/* Identity */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3
-              className={`type-heading ${picked ? "text-[length:var(--type-3)]" : "text-[length:var(--type-2)]"} text-pretty break-words text-ink`}
-            >
-              {title}
-            </h3>
-            <p className="mt-1 text-[length:var(--type-0)] text-ink-dim">
-              {typeLine || "Aircraft type unavailable"}
-            </p>
-          </div>
-          {picked && (
-            <div className="flex shrink-0 items-start gap-2.5">
-              {e?.photoThumbUrl && (
-                <AircraftPhoto
-                  src={e.photoThumbUrl}
-                  alt={`${typeLine || "Aircraft"} in flight`}
-                />
-              )}
-              {onClear && (
-                <button
-                  type="button"
-                  onClick={onClear}
-                  aria-label="Close this flight"
-                  className="chip flex items-center px-2"
-                >
-                  <X size={13} weight="bold" />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Picked card: what the board banner would have flagged. */}
-        {picked && squawk?.emergency && (
-          <div className="flex flex-wrap gap-2">
-            {squawk?.emergency && (
-              <span className="whitespace-nowrap border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
-                {squawk.label.toUpperCase()}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Route */}
-        {e?.origin || e?.destination ? (
-          <div>
-            <div className="flex items-center gap-3">
-              <Endpoint
-                code={e?.origin?.iata ?? e?.origin?.icao}
-                city={e?.origin?.municipality ?? e?.origin?.name}
-              />
-              <ArrowRight
-                size={15}
-                weight="bold"
-                className="shrink-0 text-ink-faint"
-              />
-              <Endpoint
-                code={e?.destination?.iata ?? e?.destination?.icao}
-                city={e?.destination?.municipality ?? e?.destination?.name}
-              />
-            </div>
-            {picked && e?.staleRoute && (
-              <p className="mt-2 text-[length:var(--type-0)] leading-snug text-ink-faint">
-                The route on file for this flight number ({e.staleRoute}) is
-                out of date, so only the Ottawa end is shown.
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-[length:var(--type-0)] text-ink-faint">
-            No route filed for this callsign.
+    <div className={`board-swap ${swapClass} flex flex-col gap-3.5 px-5 py-5`}>
+      {/* Identity */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="type-heading text-pretty break-words text-[length:var(--type-3)] text-ink">
+            {title}
+          </h3>
+          <p className="mt-1 text-[length:var(--type-0)] text-ink-dim">
+            {typeLine || "Aircraft type unavailable"}
           </p>
-        )}
-
-        {picked ? (
-          <>
-            {/* The fun facts: what people tap a plane for. */}
-            <AircraftFacts icaoType={e?.icaoType} />
-
-            {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
-            <p className="border-t border-line pt-2.5 text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-dim">
-              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">Live</span>
-              {numbers}
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="text-[length:var(--type-small)] leading-relaxed tracking-normal text-ink-dim">
-              <span className="mr-2 text-[length:var(--type-0)] tracking-normal">Live</span>
-              {numbers}
-            </p>
-          </>
+        </div>
+        {e?.photoThumbUrl && (
+          <AircraftPhoto
+            src={e.photoThumbUrl}
+            alt={`${typeLine || "Aircraft"} in flight`}
+          />
         )}
       </div>
-    </Root>
+
+      {squawk?.emergency && (
+        <span className="self-start whitespace-nowrap rounded border border-alert bg-alert px-2 py-0.5 text-[length:var(--type-0)] tracking-normal text-on-alert">
+          {squawk.label.toUpperCase()}
+        </span>
+      )}
+
+      {/* Route */}
+      {e?.origin || e?.destination ? (
+        <div>
+          <div className="flex items-center gap-3">
+            <Endpoint
+              code={e?.origin?.iata ?? e?.origin?.icao}
+              city={e?.origin?.municipality ?? e?.origin?.name}
+            />
+            <ArrowRight
+              size={15}
+              weight="bold"
+              aria-hidden="true"
+              className="shrink-0 text-ink-faint"
+            />
+            <span className="sr-only">to</span>
+            <Endpoint
+              code={e?.destination?.iata ?? e?.destination?.icao}
+              city={e?.destination?.municipality ?? e?.destination?.name}
+            />
+          </div>
+          {e?.staleRoute && (
+            <p className="mt-2 text-[length:var(--type-0)] leading-snug text-ink-faint">
+              The route on file for this flight number ({e.staleRoute}) is
+              out of date, so only the Ottawa end is shown.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="text-[length:var(--type-0)] text-ink-faint">
+          No route filed for this callsign.
+        </p>
+      )}
+
+      {/* The fun facts: what people tap a plane for. */}
+      <AircraftFacts icaoType={e?.icaoType} />
+
+      {/* Live numbers: kept, but quiet. The Learning Centre explains them. */}
+      <p className="border-t border-line pt-2.5 text-[length:var(--type-small)] leading-relaxed tabular-nums tracking-normal text-ink-dim">
+        <span className="mr-2 text-[length:var(--type-0)] tracking-normal">Live</span>
+        {numbers}
+      </p>
+    </div>
   );
 }
 

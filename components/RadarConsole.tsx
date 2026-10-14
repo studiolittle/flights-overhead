@@ -5,8 +5,7 @@ import { Broadcast, AirplaneLanding, AirplaneTakeoff, WarningCircle } from "@pho
 import { bearingDeg, haversineKm, project } from "@/lib/geo";
 import { HOME_AIRPORT } from "@/lib/config";
 import type { ApiResponse, Contact } from "@/lib/types";
-import { ConditionsPanel, LocalTime, RadarPanel } from "./AirportPanel";
-import type { BoardSlot } from "./FlightBoard";
+import { ConditionsPanel, LocalTime, RadarPanel, type FeedStatus } from "./AirportPanel";
 import { flightTitle } from "@/lib/aircraft";
 import { ageLabel } from "@/lib/format";
 import { FunFactsSpot } from "./FunFactsSpot";
@@ -55,6 +54,9 @@ export function RadarConsole() {
   };
 
   const pollAbort = useRef<AbortController | null>(null);
+  /** Polls failed in a row. One dropped poll is noise; two is an outage. */
+  const failures = useRef(0);
+  const hasData = useRef(false);
 
   // --- boot -------------------------------------------------------------------
   useEffect(() => {
@@ -75,13 +77,26 @@ export function RadarConsole() {
         signal: ac.signal,
         cache: "no-store",
       });
-      if (!res.ok) throw new Error(`API ${res.status}`);
+      if (!res.ok) throw new Error(`The flight feed isn't responding (error ${res.status}).`);
       const json = (await res.json()) as ApiResponse;
       setData(json);
       setFetchError(null);
+      failures.current = 0;
+      hasData.current = true;
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
-      setFetchError((err as Error).message || "Network error");
+      failures.current += 1;
+      // Before the first snapshot there is nothing to fall back on, so say so
+      // at once; after it, wait for a second miss.
+      if (failures.current < 2 && hasData.current) return;
+      const message = (err as Error).message;
+      setFetchError(
+        !navigator.onLine
+          ? "You appear to be offline."
+          : message.startsWith("The flight feed")
+            ? message
+            : "Can't reach the flight feed.",
+      );
     }
   }, []);
 
@@ -122,9 +137,8 @@ export function RadarConsole() {
 
   /**
    * Every YOW flight in the snapshot, advanced by dead reckoning. Distance and
-   * bearing are from the house: the boards and the overhead check work from
-   * these. `overhead` is fixed here because the airport scope centres on the
-   * airport and cannot derive it.
+   * bearing are from the home point (the airport unless HOME_LAT/HOME_LON
+   * move it); `overhead` is within the feed's overhead radius of it.
    */
   const reckoned: Contact[] = useMemo(() => {
     if (!data) return [];
@@ -155,7 +169,7 @@ export function RadarConsole() {
 
   /**
    * The same contacts placed around the airport and cut to the chosen range,
-   * nearest the airport first, for picking each board's lead. `overhead` (house-relative) rides along from `reckoned`.
+   * nearest the airport first, for picking the featured flight. `overhead` rides along from `reckoned`.
    */
   const live: Contact[] = useMemo(
     () =>
@@ -193,7 +207,7 @@ export function RadarConsole() {
    * then whichever is closest to the airport: the next to land, or the one
    * that just took off. Shown with its numbers from `reckoned`.
    */
-  const lead = (slot: BoardSlot): Contact | null => {
+  const lead = (slot: "arriving" | "departing"): Contact | null => {
     const inSlot = live.filter((c) => c.phase === slot);
     const top = inSlot.find((c) => c.overhead) ?? inSlot[0];
     return top ? (reckoned.find((c) => c.id === top.id) ?? null) : null;
@@ -221,6 +235,8 @@ export function RadarConsole() {
   const ageMs = data ? Math.max(0, nowTs - data.updatedAt) : null;
   const stale = ageMs != null && ageMs > STALE_MS;
   const offline = fetchError != null || stale;
+  /** Drives the status dot and the sweep, so neither claims a live feed that isn't. */
+  const feedStatus: FeedStatus = offline ? "offline" : data ? "live" : "loading";
 
   // Screen readers get the roster whenever who is in range changes, not on
   // every one-second tick.
@@ -235,7 +251,7 @@ export function RadarConsole() {
   );
 
   return (
-    <main data-dashboard-ready={mounted && Boolean(data || fetchError)} className="mx-auto flex min-h-[100dvh] max-w-[1440px] flex-col gap-5 p-4 md:p-8">
+    <main data-dashboard-ready={mounted && Boolean(data || fetchError)} className={`mx-auto flex min-h-[100dvh] max-w-[1440px] flex-col gap-5 p-4 md:p-8 ${selected && activeTab === "dashboard" ? "max-lg:pb-[calc(var(--sheet-h)+1rem)]" : ""}`}>
       <a href="#activity" className="skip-link">Skip to the flight list</a>
       <header className="flex items-start justify-between gap-4 border-b border-line pb-5">
         <div className="flex min-w-0 items-center gap-3.5">
@@ -278,7 +294,7 @@ export function RadarConsole() {
         ))}
       </div>
 
-      <div id="dashboard-panel" role="tabpanel" aria-labelledby="dashboard-tab" tabIndex={0} hidden={activeTab !== "dashboard"} className="min-w-0">
+      <div id="dashboard-panel" role="tabpanel" aria-labelledby="dashboard-tab" hidden={activeTab !== "dashboard"} className="min-w-0">
       <p className="sr-only" role="status" aria-live="polite">{mounted && data ? roster : ""}</p>
       {!mounted ? (
         <p className="py-8 text-center text-ink-dim">Scanning the sky…</p>
@@ -286,7 +302,7 @@ export function RadarConsole() {
         <div className="grid items-start gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,1fr)]">
           {/* The stage: the radar is the page, drawn straight onto the sky. */}
           <div className="flex min-w-0 flex-col gap-4">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[length:var(--type-small)] text-ink-dim">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[length:var(--type-small)] tabular-nums text-ink-dim">
               <span className="flex flex-wrap items-center gap-x-2">
                 <span className="font-semibold text-ink">{data ? live.length : "—"}</span>
                 aircraft within {effectiveRange} km
@@ -294,24 +310,25 @@ export function RadarConsole() {
                   <span className="text-ink-faint">· updated {ageLabel(ageMs)} ago</span>
                 )}
               </span>
-              <LocalTime nowTs={nowTs} />
+              <LocalTime nowTs={nowTs} status={feedStatus} />
             </div>
 
             {offline && (
-              <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-depart/50 bg-depart/10 px-3 py-2 text-[length:var(--type-0)] text-ink">
-                <WarningCircle size={18} weight="bold" aria-hidden="true" className="shrink-0 text-depart" />
-                <span>
-                  {data && ageMs != null
-                    ? `The flight feed hasn't updated for ${ageLabel(ageMs)}. What you see may be out of date.`
-                    : "Can't reach the flight feed right now."}
+              <p role="status" className="flex items-center gap-2.5 rounded-lg border border-alert/50 bg-alert/10 py-1.5 pl-3 pr-1 text-[length:var(--type-0)] leading-snug text-ink">
+                <WarningCircle size={18} weight="bold" aria-hidden="true" className="shrink-0 text-alert" />
+                <span className="min-w-0 flex-1">
+                  {stale && ageMs != null
+                    ? `The flight feed hasn't updated for ${ageLabel(ageMs)}, so what you see may be out of date.`
+                    : fetchError}{" "}
+                  Checking again every {Math.round(POLL_MS / 1000)} seconds.
                 </span>
-                <button type="button" onClick={load} className="font-semibold text-accent-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-accent-ink">
-                  Try again
+                <button type="button" onClick={load} className="inline-flex min-h-11 shrink-0 items-center px-2.5 font-semibold text-accent-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-accent-ink">
+                  Try now
                 </button>
               </p>
             )}
 
-            <RadarPanel contacts={reckoned} ready={data != null} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} />
+            <RadarPanel contacts={reckoned} ready={data != null} live={feedStatus === "live"} selectedId={selectedId} onSelect={toggleSelect} wind={airport.wind} landing={airport.landing} takeoff={airport.takeoff} />
 
             <section id="activity" tabIndex={-1} className="flex min-w-0 scroll-mt-4 flex-col gap-3" aria-labelledby="activity-title">
               <h2 id="activity-title" className="sr-only">Arriving and departing flights</h2>
@@ -323,14 +340,15 @@ export function RadarConsole() {
                     <h3 className={`flex items-center gap-2 sm:mr-1 sm:min-h-11 text-[length:var(--type-0)] font-semibold ${arrive ? "text-accent-ink" : "text-depart"}`}>
                       {arrive ? <AirplaneLanding size={20} weight="bold" aria-hidden="true" /> : <AirplaneTakeoff size={20} weight="bold" aria-hidden="true" />}
                       {arrive ? "Arriving" : "Departing"}
-                      <span className="tabular-nums text-ink-dim">{flights.length}</span>
+                      <span className="tabular-nums text-ink-dim"><span className="sr-only">, </span>{flights.length}</span>
                     </h3>
                     <div className="flex flex-wrap items-center gap-2">
                     {flights.map((flight) => (
                       <button key={flight.id} type="button" aria-pressed={selectedId === flight.id} onClick={() => toggleSelect(flight.id)}
-                        className={`flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${selectedId === flight.id ? arrive ? "border-accent-ink bg-accent/25 text-ink" : "border-depart bg-depart/15 text-ink" : "border-line-strong text-ink hover:bg-surface-2"}`}>
+                        aria-label={`${flightTitle(flight)}, ${flight.distanceKm.toFixed(1)} kilometres from the airport`}
+                        className={`flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-[length:var(--type-small)] transition-colors focus-visible:outline-2 focus-visible:outline-accent-ink ${selectedId === flight.id ? arrive ? "border-accent-ink bg-accent/25 text-ink" : "border-depart bg-depart/20 text-ink" : "border-line-strong text-ink hover:bg-surface-2"}`}>
                         <span className="font-medium">{flightTitle(flight)}</span>
-                        <span className="text-ink-dim">{flight.distanceKm.toFixed(1)} km</span>
+                        <span className="tabular-nums text-ink-dim">{flight.distanceKm.toFixed(1)} km</span>
                       </button>
                     ))}
                     {!flights.length && <span className="text-[length:var(--type-small)] text-ink-dim">{loading ? "Listening…" : "none right now"}</span>}
@@ -347,7 +365,7 @@ export function RadarConsole() {
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
-            <FunFactsSpot selected={selected} featured={arriving ?? departing ?? live[0] ?? null} onClear={clearSelection} state={loading ? "loading" : offline && !data ? "offline" : "ready"} />
+            <FunFactsSpot radarId="radar" selected={selected} featured={arriving ?? departing ?? live[0] ?? null} onClear={clearSelection} state={loading ? "loading" : offline && !data ? "offline" : "ready"} />
             <ConditionsPanel nowTs={nowTs} weather={airport.weather} landing={airport.landing} takeoff={airport.takeoff} />
             <p className="px-1 text-[length:var(--type-small)] leading-relaxed text-ink-dim">
               Curious what the codes and numbers mean?{" "}
@@ -360,16 +378,15 @@ export function RadarConsole() {
       )}
       </div>
 
-      <div id="learning-panel" role="tabpanel" aria-labelledby="learning-tab" tabIndex={0} hidden={activeTab !== "learning"} className="mx-auto w-full max-w-4xl min-w-0">
-        <LearningCentre flight={focus} flights={live} selectedId={selectedId} onPick={setSelectedId} />
+      <div id="learning-panel" role="tabpanel" aria-labelledby="learning-tab" hidden={activeTab !== "learning"} className="mx-auto w-full max-w-4xl min-w-0">
+        <LearningCentre flight={focus} flights={live} selectedId={selectedId} onPick={setSelectedId} hidden={activeTab !== "learning"} />
       </div>
 
-      <footer className="order-2 mt-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line pt-5 text-[length:var(--type-0)] tracking-normal text-ink-dim">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span>Built by Jesse Little</span>
-          <a href="mailto:info@studiolittle.ca" className="transition-colors hover:text-accent-ink">info@studiolittle.ca</a>
+      <footer className="order-2 mt-auto flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-t border-line pt-2 text-[length:var(--type-0)] tracking-normal text-ink-dim">
+        <div className="flex flex-wrap items-center gap-x-3">
+          <a href="https://studiolittle.ca" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline-offset-4 transition-colors hover:text-accent-ink hover:underline focus-visible:outline-2 focus-visible:outline-accent-ink">studiolittle.ca</a>
           <span aria-hidden="true" className="text-ink-faint">·</span>
-          <a href="https://adsb.lol" target="_blank" rel="noopener noreferrer" className="underline-offset-4 hover:text-accent-ink hover:underline">Flight data by adsb.lol</a>
+          <a href="https://adsb.lol" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline-offset-4 transition-colors hover:text-accent-ink hover:underline focus-visible:outline-2 focus-visible:outline-accent-ink">Flight data by adsb.lol</a>
         </div>
         <ViewerCount active={activeTab === "dashboard"} />
       </footer>

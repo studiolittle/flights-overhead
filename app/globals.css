@@ -36,7 +36,7 @@
   --c-accent-ink: #a8d8ff;
   --c-on-accent: #0b1426;
 
-  --c-depart: #b9b1ff; /* periwinkle separates departures from ice-blue arrivals */
+  --c-depart: #ffc27a; /* warm amber: departures read apart from ice-blue arrivals */
   --c-on-depart: #0b1426;
   --c-alert: #ff969f;
   --c-live: #5fd694;
@@ -44,8 +44,10 @@
 
   --c-grid: rgb(168 216 255 / 0.13);
   --c-sweep: 168 216 255;
-  --c-glow: rgb(168 216 255 / 0.3);
   --c-vignette: rgb(2 7 20 / 0.4);
+
+  /* Height of the phone flight sheet; the page pads by it so nothing hides. */
+  --sheet-h: 52dvh;
 }
 
 @theme inline {
@@ -92,7 +94,8 @@ body {
     linear-gradient(#050817, #161c4f);
 }
 
-.night-sky canvas { display: block; }
+.night-sky canvas { display: block; animation: sky-in 800ms ease-out; }
+@keyframes sky-in { from { opacity: 0; } }
 
 .app-loader {
   position: fixed;
@@ -158,11 +161,8 @@ body {
   font-weight: 400;
   line-height: 1.5;
   letter-spacing: 0;
-  /* Inter is proportional, and almost every number on this page
-     rewrites once a second. Tabular figures stop the readouts jittering.
-     Inherited, so SVG <text> in the radar picks it up too. */
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum" 1;
+  /* Readouts that tick every second opt into tabular figures with the
+     tabular-nums utility; prose keeps Inter's natural spacing. */
   transition: color 200ms ease;
 }
 
@@ -197,10 +197,6 @@ body::after {
   @apply rounded-2xl border border-line bg-surface shadow-sm;
 }
 
-.glow {
-  text-shadow: 0 0 14px var(--c-glow);
-}
-
 .field {
   background: var(--c-surface-2);
   border: 1px solid var(--c-line-strong);
@@ -215,33 +211,6 @@ body::after {
 .field::placeholder {
   color: var(--c-ink-dim);
   letter-spacing: -0.01em;
-}
-
-.btn {
-  background: var(--c-accent);
-  border: 1px solid var(--c-accent);
-  @apply rounded-lg shadow-sm;
-  color: var(--c-on-accent);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--type-0);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  padding: 0.55rem 0.95rem;
-  transition: filter 150ms ease, transform 120ms ease;
-}
-
-.btn:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-
-.btn:active:not(:disabled) {
-  transform: scale(0.97);
-}
-
-.btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .chip {
@@ -268,47 +237,16 @@ body::after {
   opacity: 0.5;
 }
 
-.chip-on {
-  background: color-mix(in srgb, var(--c-accent) 16%, transparent);
-  border-color: var(--c-accent-ink);
-  color: var(--c-accent-ink);
-}
-
-.row {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-left: 2px solid transparent;
-  cursor: pointer;
-  display: flex;
-  font: inherit;
-  gap: 0.75rem;
-  padding: 0.6rem 1rem 0.6rem calc(1rem - 2px);
-  text-align: left;
-  transition: background 140ms ease, border-color 140ms ease;
-  width: 100%;
-}
-
-.row:hover {
-  background: color-mix(in srgb, var(--c-accent) 7%, transparent);
-}
-
-.row-on {
-  background: color-mix(in srgb, var(--c-accent) 12%, transparent);
-  border-left-color: var(--c-accent-ink);
-}
-
 /* Visible keyboard focus on every interactive surface. */
 .field:focus-visible,
-.btn:focus-visible,
 .chip:focus-visible,
-.row:focus-visible,
 .blip:focus-visible {
   outline: 2px solid var(--c-accent-ink);
   outline-offset: 2px;
 }
 
 /* An outline on an SVG <g> is unreliable, so the blip draws its own ring. */
+.blip:focus,
 .blip:focus-visible { outline: none; }
 .blip-focus { opacity: 0; }
 .blip:focus-visible .blip-focus { opacity: 1; }
@@ -329,7 +267,7 @@ body::after {
 /* ------------------------------------------------------------------ *
  *  Radar motion. Each animation earns its place:
  *  sweep = the feed is scanning, blip-in = a new contact appeared,
- *  pulse = something is directly overhead, live-dot = link is up.
+ *  status-dot = the feed is live.
  * ------------------------------------------------------------------ */
 
 @keyframes radar-spin {
@@ -346,27 +284,6 @@ body::after {
   to {
     opacity: 1;
     transform: scale(1);
-  }
-}
-
-@keyframes pulse-ring {
-  0% {
-    opacity: 0.7;
-    transform: scale(0.5);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.9);
-  }
-}
-
-@keyframes pulse-soft {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
   }
 }
 
@@ -413,28 +330,56 @@ body::after {
   background: linear-gradient(to bottom, rgb(var(--c-sweep) / 0.7), transparent);
 }
 
-.live-dot {
-  animation: live-blink 1.6s ease-in-out infinite;
-}
-
-/* Small "online" indicator next to the local clock. */
+/* Feed indicator next to the local clock: green and breathing only while
+   the feed is current, a still warning colour when it isn't. */
 .status-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  background: var(--c-ink-faint);
+}
+.status-live {
   background: var(--c-live);
   animation: live-blink 2.6s ease-in-out infinite;
 }
-
-/* Draws the eye to the phase icon while an aircraft is actually overhead. */
-.pulse-soft {
-  animation: pulse-soft 1.4s ease-in-out infinite;
-  display: inline-flex;
-}
+.status-offline { background: var(--c-alert); }
 
 .blip {
   transition: transform 1000ms linear;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Phone flight sheet. Below lg a tapped flight docks along the bottom of
+ *  the screen while the radar stays in view above it. The header sticks so
+ *  the close button is always in reach.
+ * ------------------------------------------------------------------ */
+
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+
+@media (max-width: 1023.98px) {
+  .spot-sheet {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    max-height: var(--sheet-h);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-bottom: 0;
+    border-radius: 1rem 1rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -12px 32px rgb(2 7 20 / 0.55);
+    animation: sheet-in 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .spot-sheet > :first-child {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--c-surface);
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -462,12 +407,6 @@ body::after {
   transform-box: fill-box;
   transform-origin: center;
   animation: blip-in 500ms ease-out;
-}
-
-.pulse-ring {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: pulse-ring 1800ms ease-out infinite;
 }
 
 /* A helicopter's main rotor, spinning about its mast. The blades are drawn
@@ -513,16 +452,16 @@ body::after {
   .detect-ping {
     display: none;
   }
-  .live-dot,
   .blip-body,
-  .pulse-ring,
-  .pulse-soft,
-  .status-dot,
+  .status-live,
   .rotor {
     animation: none;
   }
   .blip {
     transition: none;
+  }
+  .spot-sheet {
+    animation: none;
   }
   .board-swap,
   .board-leave,

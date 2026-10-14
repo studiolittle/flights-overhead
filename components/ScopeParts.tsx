@@ -4,7 +4,7 @@
 // the same on both.
 
 import { createContext, useContext, type MouseEvent } from "react";
-import { isRotorcraft } from "@/lib/aircraft";
+import { flightTitle, isRotorcraft } from "@/lib/aircraft";
 import { flightLevel, metersToFt } from "@/lib/format";
 import type { Contact, FlightPhase } from "@/lib/types";
 
@@ -91,7 +91,7 @@ export function ScopeFrame({
   // On a narrow scope the inner ring labels would crowd the aircraft.
   const rings = width < 420 ? RINGS.filter((f) => f >= 0.5 && f !== 0.75) : RINGS;
   return (
-    <g>
+    <g aria-hidden="true">
       {rings.map((f) => (
         <g key={f}>
           <circle
@@ -109,7 +109,7 @@ export function ScopeFrame({
             fill="var(--color-ink-faint)"
             fontSize={u(14)}
           >
-            {Math.round(rangeKm * f)}
+            {+(rangeKm * f).toFixed(1)}
             {f === 1 ? " KM" : ""}
           </text>
         </g>
@@ -176,7 +176,96 @@ export function ScopeFrame({
   );
 }
 
-/** One aircraft: silhouette pointing along its track, callsign, altitude. */
+/** Where a blip's callsign sits, and the box it takes up (viewBox units). */
+export type LabelSpot = {
+  side: "left" | "right";
+  dy: number;
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+};
+
+/** Gap between a plane's centre and its label, in viewBox units. */
+const LABEL_GAP = 34;
+
+/**
+ * Place every blip's label so labels don't sit on each other or on another
+ * plane: try the natural side, then the other side, then a line lower or
+ * higher. Greedy and cheap; the scope rarely holds more than a dozen planes.
+ */
+export function placeLabels(
+  planes: { c: Contact; x: number; y: number }[],
+  u: (px: number) => number,
+): LabelSpot[] {
+  const half = u(18);
+  const step = u(34);
+  const planeR = u(14);
+  const taken: LabelSpot[] = [];
+  const hitsPlane = (b: LabelSpot, self: number) =>
+    planes.some(
+      (p, j) =>
+        j !== self &&
+        p.x + planeR > b.x0 &&
+        p.x - planeR < b.x1 &&
+        p.y + planeR > b.y0 &&
+        p.y - planeR < b.y1,
+    );
+  const overlaps = (a: LabelSpot, b: LabelSpot) =>
+    a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+
+  return planes.map(({ c, x, y }, i) => {
+    const width = Math.max(c.callsign.length, 5) * u(15) * 0.62;
+    const natural = x > SIZE * FLIP_AFTER ? "left" : "right";
+    const other = natural === "left" ? "right" : "left";
+    const box = (side: "left" | "right", dy: number): LabelSpot => {
+      const x0 = side === "right" ? x + LABEL_GAP : x - LABEL_GAP - width;
+      return { side, dy, x0, x1: x0 + width, y0: y + dy - half, y1: y + dy + half };
+    };
+    const tries = [
+      box(natural, 0),
+      box(other, 0),
+      box(natural, step),
+      box(other, step),
+      box(natural, -step),
+      box(other, -step),
+    ];
+    const spot =
+      tries.find((b) => !taken.some((t) => overlaps(t, b)) && !hitsPlane(b, i)) ??
+      tries[0];
+    taken.push(spot);
+    return spot;
+  });
+}
+
+/** A small aircraft for the legend, drawn the way the scope draws it. */
+export function PlaneGlyph({ color, hollow }: { color: string; hollow: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="-26 -26 52 52" aria-hidden="true">
+      <path
+        d={PLANE_PATH}
+        fill={hollow ? "transparent" : color}
+        stroke={hollow ? color : "none"}
+        strokeWidth={hollow ? 3.5 : 0}
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Spoken phase, matching the list under the radar. */
+const PHASE_SPOKEN: Record<FlightPhase, string> = {
+  arriving: "arriving",
+  departing: "departing",
+  overflight: "passing over",
+  unknown: "nearby",
+};
+
+/**
+ * One aircraft: silhouette pointing along its track, callsign, altitude.
+ * Arrivals are solid; departures are hollow, so the two read apart without
+ * relying on hue.
+ */
 export function Blip({
   contact: c,
   x,
@@ -184,8 +273,8 @@ export function Blip({
   distanceKm,
   color,
   selected,
-  pulse,
   fresh = false,
+  label,
   onSelect,
 }: {
   contact: Contact;
@@ -195,23 +284,28 @@ export function Blip({
   distanceKm: number;
   color: string;
   selected: boolean;
-  pulse: boolean;
   /** Just picked up by the radar sweep: plays the detection ping. */
   fresh?: boolean;
+  /** Where the callsign goes, from placeLabels(). */
+  label: LabelSpot;
   onSelect: (icao24: string, ev?: MouseEvent) => void;
 }) {
   const track = c.trackDeg ?? 0;
   const altFt = metersToFt(c.baroAltitudeM);
   const heli = isRotorcraft(c);
+  const hollow = c.phase === "departing";
   const iconScale = selected ? 1.35 : 1.2;
   const u = useScopeUnits();
   const width = useContext(ScopeWidthContext);
   // On a narrow scope the aircraft crowd the airport: the altitude waits
   // until you pick the plane.
   const showAlt = width >= 420 || selected;
-  const flip = x > SIZE * FLIP_AFTER;
-  const labelX = flip ? -34 : 34;
-  const anchor = flip ? "end" : "start";
+  const labelX = label.side === "right" ? LABEL_GAP : -LABEL_GAP;
+  const anchor = label.side === "right" ? "start" : "end";
+  // Hollow shapes keep the panel colour inside and the phase colour as an outline.
+  const body = hollow
+    ? { fill: "var(--color-surface)", stroke: color, strokeWidth: 3, strokeLinejoin: "round" as const }
+    : { fill: color, strokeWidth: 2.5, style: HALO };
 
   return (
     <g
@@ -220,7 +314,8 @@ export function Blip({
       onClick={(ev) => onSelect(c.id, ev)}
       role="button"
       tabIndex={0}
-      aria-label={`${heli ? "Helicopter " : ""}${c.callsign}, ${flightLevel(c.baroAltitudeM)}, ${distanceKm.toFixed(1)} kilometres`}
+      aria-pressed={selected}
+      aria-label={`${flightTitle(c)}${heli ? ", helicopter" : ""}, ${PHASE_SPOKEN[c.phase]}, ${flightLevel(c.baroAltitudeM)}, ${distanceKm.toFixed(1)} kilometres from the airport`}
       onKeyDown={(ev) => {
         if (ev.key === "Enter" || ev.key === " ") {
           ev.preventDefault();
@@ -228,8 +323,8 @@ export function Blip({
         }
       }}
     >
-      {/* generous invisible hit target: about a fingertip on a phone */}
-      <circle cx={0} cy={0} r={60} fill="transparent" />
+      {/* Invisible hit target: at least a 48px fingertip at any scope width. */}
+      <circle cx={0} cy={0} r={Math.max(60, u(24))} fill="transparent" />
       {/* Keyboard focus ring drawn in the SVG: an outline on a <g> is unreliable. */}
       <circle
         className="blip-focus"
@@ -241,17 +336,6 @@ export function Blip({
         strokeWidth={4}
       />
 
-      {pulse && (
-        <circle
-          className="pulse-ring"
-          cx={0}
-          cy={0}
-          r={34}
-          fill="none"
-          stroke="var(--color-alert)"
-          strokeWidth={2.5}
-        />
-      )}
       {/* Just picked up by the sweep: one ring ripples out, then it's gone. */}
       {fresh && (
         <circle
@@ -279,7 +363,7 @@ export function Blip({
       <g className="blip-body">
         {heli ? (
           <g transform={`rotate(${track}) scale(${iconScale})`}>
-            <path d={HELI_BODY} fill={color} strokeWidth={2.5} style={HALO} />
+            <path d={HELI_BODY} {...body} />
             <g transform={`translate(0 ${HELI_MAST_Y})`}>
               {/* The blur of the blades, under the blades themselves. */}
               <circle r={22} fill={color} opacity={0.14} />
@@ -297,14 +381,12 @@ export function Blip({
           <path
             d={PLANE_PATH}
             transform={`rotate(${track}) scale(${iconScale})`}
-            fill={color}
-            strokeWidth={2.5}
-            style={HALO}
+            {...body}
           />
         )}
         <text
           x={labelX}
-          y={-u(4)}
+          y={label.dy - u(4)}
           textAnchor={anchor}
           fill={color}
           fontSize={u(15)}
@@ -316,7 +398,7 @@ export function Blip({
         </text>
         {showAlt && <text
           x={labelX}
-          y={u(14)}
+          y={label.dy + u(14)}
           textAnchor={anchor}
           fill="var(--color-ink-dim)"
           fontSize={u(14)}
